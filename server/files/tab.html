@@ -1,0 +1,695 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>New tab</title>
+        <style>
+            ::-webkit-scrollbar {
+                width: 12px;
+                height: 12px;
+                background: transparent;
+            }
+
+            ::-webkit-scrollbar-thumb {
+                background: linear-gradient(135deg, #2563eb 40%, #1e293b 100%);
+                border-radius: 8px;
+                border: 2px solid #0f172a;
+                min-height: 40px;
+            }
+
+            ::-webkit-scrollbar-thumb:hover {
+                background: linear-gradient(135deg, #3b82f6 40%, #334155 100%);
+            }
+
+            ::-webkit-scrollbar-track {
+                background: rgba(30, 41, 59, 0.3);
+                border-radius: 8px;
+            }
+
+            ::-webkit-scrollbar-corner {
+                background: transparent;
+            }
+            * {
+                scrollbar-width: thin;
+                scrollbar-color: #2563eb #1e293b;
+            }
+        </style>
+        <div id="__newtab_scripts"></div>
+        <script>
+            (function () {
+                console.log("[Newtab] Loading scripts...");
+                const urls = [
+                    "https://unpkg.com/@babel/standalone@7.28.5/babel.min.js",
+                    "https://unpkg.com/react@18.3.1/umd/react.production.min.js",
+                    "https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js",
+                    "https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4",
+                    "https://unpkg.com/dexie/dist/dexie.js",
+                ];
+
+                for (let i = 0; i < urls.length; i++) {
+                    const key = `res_${urls[i]}`;
+
+                    if (!localStorage.getItem(key)) {
+                        console.warn(
+                            `[Newtab] Resource not found in localStorage: ${urls[i]}`,
+                        );
+                        location.href =
+                            "/load?reason=load.missing&reason.target=" +
+                            encodeURIComponent(urls[i]);
+                        return;
+                    }
+
+                    const scriptText = localStorage.getItem(key);
+                    if (scriptText) {
+                        const scriptElem = document.createElement("script");
+                        scriptElem.textContent = scriptText;
+                        document
+                            .getElementById("__newtab_scripts")
+                            .appendChild(scriptElem);
+                        console.log(
+                            `[Newtab] Loaded resource from localStorage: ${urls[i]}`,
+                        );
+                    } else {
+                        console.error(
+                            `[Newtab] Empty resource in localStorage: ${urls[i]}`,
+                        );
+                        location.href =
+                            "/load?reason=load.empty&reason.target=" +
+                            encodeURIComponent(urls[i]);
+                        return;
+                    }
+                }
+
+                console.log("[Newtab] All scripts loaded successfully.");
+            })();
+        </script>
+    </head>
+    <body
+        style="background-color: black"
+        class="overflow-hidden h-screen w-screen text-white"
+    >
+        <div id="root"></div>
+        <script defer type="text/babel">
+            const { useState, useEffect, useRef } = React;
+
+            let isEditMode = false;
+
+            document.body.removeAttribute("style");
+
+            let bg = localStorage.getItem("prefs_bg") || "";
+
+            if (!bg) {
+                bg = JSON.stringify({
+                    type: "solidcolor",
+                    color: "#000",
+                });
+                localStorage.setItem("prefs_bg", bg);
+            }
+
+            function bg_to_css(bg_object) {
+                if (bg_object.type === "solidcolor") {
+                    return bg_object.color;
+                } else if (bg_object.type === "gradient") {
+                  return `linear-gradient(in oklch ${bg_object.angle}deg, ${bg_object.colors.join(", ")})`;
+                } else if (bg_object.type === "image") {
+                    return `url(${bg_object.url}) center/cover no-repeat`;
+                } else {
+                    return "#000";
+                }
+            }
+
+            document.body.style.background = bg_to_css(JSON.parse(bg));
+
+            function EditWindow({ title, icon, content, onClose, onFocus }) {
+                const [pos, setPos] = useState({
+                    x: 100 + Math.floor(Math.random() * 500),
+                    y: 100 + Math.floor(Math.random() * 200),
+                });
+                const windowRef = useRef(null);
+                const draggingRef = useRef(false);
+                const startRef = useRef({ x: 0, y: 0, origX: 0, origY: 0 });
+
+                useEffect(() => {
+                    function onMove(e) {
+                        if (!draggingRef.current) return;
+                        let clientX, clientY;
+                        if (e.type.startsWith("touch")) {
+                            const t = e.touches[0] || e.changedTouches[0];
+                            clientX = t.clientX;
+                            clientY = t.clientY;
+                        } else {
+                            clientX = e.clientX;
+                            clientY = e.clientY;
+                        }
+                        const dx = clientX - startRef.current.x;
+                        const dy = clientY - startRef.current.y;
+                        setPos({
+                            x: startRef.current.origX + dx,
+                            y: startRef.current.origY + dy,
+                        });
+                        if (e.preventDefault) e.preventDefault();
+                    }
+
+                    function onUp() {
+                        if (!draggingRef.current) return;
+                        draggingRef.current = false;
+                        document.body.style.userSelect = "";
+                        window.removeEventListener("mousemove", onMove);
+                        window.removeEventListener("mouseup", onUp);
+                        window.removeEventListener("touchmove", onMove);
+                        window.removeEventListener("touchend", onUp);
+                    }
+
+                    window.addEventListener("mousemove", onMove);
+                    window.addEventListener("mouseup", onUp);
+                    window.addEventListener("touchmove", onMove, {
+                        passive: false,
+                    });
+                    window.addEventListener("touchend", onUp);
+
+                    return () => {
+                        draggingRef.current = false;
+                        window.removeEventListener("mousemove", onMove);
+                        window.removeEventListener("mouseup", onUp);
+                        window.removeEventListener("touchmove", onMove);
+                        window.removeEventListener("touchend", onUp);
+                    };
+                }, []);
+
+                function startDrag(e) {
+                    if (e.button === 2) return;
+                    let clientX, clientY;
+                    if (e.type === "touchstart") {
+                        const t = e.touches[0];
+                        clientX = t.clientX;
+                        clientY = t.clientY;
+                    } else {
+                        clientX = e.clientX;
+                        clientY = e.clientY;
+                    }
+
+                    draggingRef.current = true;
+                    startRef.current = {
+                        x: clientX,
+                        y: clientY,
+                        origX: pos.x,
+                        origY: pos.y,
+                    };
+
+                    document.body.style.userSelect = "none";
+
+                    function onMove(e) {
+                        if (!draggingRef.current) return;
+                        let mX, mY;
+                        if (e.type.startsWith("touch")) {
+                            const t = e.touches[0] || e.changedTouches[0];
+                            mX = t.clientX;
+                            mY = t.clientY;
+                        } else {
+                            mX = e.clientX;
+                            mY = e.clientY;
+                        }
+                        const dx = mX - startRef.current.x;
+                        const dy = mY - startRef.current.y;
+                        setPos({
+                            x: startRef.current.origX + dx,
+                            y: startRef.current.origY + dy,
+                        });
+                        if (e.preventDefault) e.preventDefault();
+                    }
+
+                    function onUp() {
+                        draggingRef.current = false;
+                        document.body.style.userSelect = "";
+                        window.removeEventListener("mousemove", onMove);
+                        window.removeEventListener("mouseup", onUp);
+                        window.removeEventListener("touchmove", onMove);
+                        window.removeEventListener("touchend", onUp);
+                    }
+
+                    window.addEventListener("mousemove", onMove);
+                    window.addEventListener("mouseup", onUp);
+                    window.addEventListener("touchmove", onMove, {
+                        passive: false,
+                    });
+                    window.addEventListener("touchend", onUp);
+                    if (e.preventDefault) e.preventDefault();
+                }
+
+                function handleFocus(e) {
+                    if (onFocus) onFocus();
+                }
+
+                return (
+                    <div
+                        ref={windowRef}
+                        className="window border-1 rounded min-w-[300px] bg-black/80 shadow-sm text-white backdrop-blur-md"
+                        style={{
+                            position: "absolute",
+                            left: pos.x + "px",
+                            top: pos.y + "px",
+                            zIndex: undefined,
+                        }}
+                        onMouseDown={handleFocus}
+                        onTouchStart={handleFocus}
+                    >
+                        <div
+                            className="window__titlebar cursor-grab flex justify-between items-center border-b-1 bg-blue-600/20 rounded-t hover:bg-blue-600/30 backdrop-blur-md"
+                            onMouseDown={startDrag}
+                            onTouchStart={startDrag}
+                        >
+                            <div className="flex gap-2 items-center pl-2">
+                                {icon && <div>{icon}</div>}
+                                <p>{title}</p>
+                            </div>
+
+                            <button
+                                className="window__titlebar_close w-8 h-8 text-white rounded-full cursor-pointer"
+                                onClick={onClose}
+                            >
+                                <svg
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    width="1em"
+                                    height="1em"
+                                    viewBox="0 0 24 24"
+                                >
+                                    <path
+                                        fill="currentColor"
+                                        d="M19 6.41L17.59 5L12 10.59L6.41 5L5 6.41L10.59 12L5 17.59L6.41 19L12 13.41L17.59 19L19 17.59L13.41 12z"
+                                    />
+                                </svg>
+                            </button>
+                        </div>
+                        <div className="window__content p-2 max-h-[360px] overflow-auto">
+                            {content}
+                        </div>
+                    </div>
+                );
+            }
+
+            let windows = [];
+
+            function focusWindow(windowObj) {
+                windows = windows.filter((w) => w !== windowObj);
+                windows.push(windowObj);
+                windows.forEach((w, i) => {
+                    if (w.container) {
+                        w.container.style.zIndex = 1000 + i;
+                    }
+                });
+            }
+
+            function createWindow(title, content, icon, id) {
+                if (id) {
+                    const existing = windows.find((w) => w.id === id);
+                    if (existing) {
+                        focusWindow(existing);
+                        return;
+                    }
+                }
+
+                const container = document.createElement("div");
+                container.style.position = "absolute";
+                document.body.appendChild(container);
+
+                function closeWindow() {
+                    ReactDOM.unmountComponentAtNode(container);
+                    document.body.removeChild(container);
+                    windows = windows.filter((w) => w.container !== container);
+                    // Update z-indexes after removal
+                    windows.forEach((w, i) => {
+                        if (w.container) {
+                            w.container.style.zIndex = 1000 + i;
+                        }
+                    });
+                }
+
+                function handleFocus() {
+                    const winObj = windows.find(
+                        (w) => w.container === container,
+                    );
+                    if (winObj) {
+                        focusWindow(winObj);
+                    }
+                }
+
+                ReactDOM.render(
+                    <EditWindow
+                        title={title}
+                        icon={icon}
+                        content={content}
+                        onClose={closeWindow}
+                        onFocus={handleFocus}
+                    />,
+                    container,
+                );
+
+                const winObj = { container, closeWindow, id };
+                windows.push(winObj);
+                focusWindow(winObj);
+            }
+
+            function Tab({ text, isOpen }) {
+                return (
+                    <div
+                        className={`px-3 py-1 rounded cursor-pointer ${
+                            isOpen ? "bg-white/20" : ""
+                        }`}
+                    >
+                        <span>{text}</span>
+                    </div>
+                );
+            }
+
+            function openBackgroundEditor() {
+                function BackgroundEditorContent({ onClose }) {
+                    const [bgMode, setBgMode] = useState(() => {
+                        const bgData = localStorage.getItem("prefs_bg");
+                        if (bgData) {
+                            const bgObj = JSON.parse(bgData);
+                            return bgObj.type;
+                        }
+                        return "solidcolor";
+                    });
+
+                    const modes = [
+                        { key: "solidcolor", label: "Color" },
+                        { key: "gradient", label: "Gradient" },
+                        { key: "image", label: "Image" },
+                    ];
+
+                    const curBgSolid =
+                        JSON.parse(localStorage.getItem("prefs_bg") || "{}") ||
+                        {};
+                    const solidColor = curBgSolid.color || "#000000";
+
+                    const curBgGradient =
+                        JSON.parse(localStorage.getItem("prefs_bg") || "{}") ||
+                        {};
+                    const gradientAngle = curBgGradient.angle ?? 90;
+                    const gradientColors = curBgGradient.colors || [
+                        "#2563eb",
+                        "#1e293b",
+                    ];
+
+                    function decodeProxyUrl(proxyUrl) {
+                        console.log(proxyUrl);
+                        try {
+                            return decodeURIComponent(
+                                atob(proxyUrl.split("url=")[1]),
+                            );
+                        } catch {
+                            return "";
+                        }
+                    }
+                    function encodeProxyUrl(url) {
+                        if (!url) return "";
+                        return "/proxy?url=" + btoa(encodeURIComponent(url));
+                    }
+                    const curBgImage =
+                        JSON.parse(localStorage.getItem("prefs_bg") || "{}") ||
+                        {};
+                    const [inputUrl, setInputUrl] = useState(
+                        decodeProxyUrl(curBgImage.url),
+                    );
+
+                    function applyColor(value) {
+                        const newBg = {
+                            type: "solidcolor",
+                            color: value,
+                        };
+                        localStorage.setItem("prefs_bg", JSON.stringify(newBg));
+                        document.body.style.background = bg_to_css(newBg);
+                    }
+
+                    function updateGradient() {
+                        const elAngle = document.querySelector(
+                            "[data-bg-gradient-angle]",
+                        );
+                        const elC1 = document.querySelector(
+                            "[data-bg-gradient-c1]",
+                        );
+                        const elC2 = document.querySelector(
+                            "[data-bg-gradient-c2]",
+                        );
+                        const a = Number((elAngle && elAngle.value) || 90);
+                        const c1 = (elC1 && elC1.value) || "#2563eb";
+                        const c2 = (elC2 && elC2.value) || "#1e293b";
+                        const newBg = {
+                            type: "gradient",
+                            angle: a,
+                            colors: [c1, c2],
+                        };
+                        localStorage.setItem("prefs_bg", JSON.stringify(newBg));
+                        document.body.style.background = bg_to_css(newBg);
+                    }
+
+                    function handleImageUrlChange(e) {
+                        const v = e.target.value;
+                        setInputUrl(v);
+                        const newBg = { type: "image", url: encodeProxyUrl(v) };
+                        localStorage.setItem("prefs_bg", JSON.stringify(newBg));
+                        document.body.style.background = bg_to_css(newBg);
+                    }
+
+                    // Helper to set mode and update prefs_bg immediately
+                    function handleTabClick(modeKey) {
+                        setBgMode(modeKey);
+
+                        let newBg;
+                        if (modeKey === "solidcolor") {
+                            newBg = {
+                                type: "solidcolor",
+                                color: solidColor,
+                            };
+                        } else if (modeKey === "gradient") {
+                            newBg = {
+                                type: "gradient",
+                                angle: gradientAngle,
+                                colors: gradientColors,
+                            };
+                        } else if (modeKey === "image") {
+                            newBg = {
+                                type: "image",
+                                url: curBgImage.url || "",
+                            };
+                        }
+                        if (newBg) {
+                            localStorage.setItem(
+                                "prefs_bg",
+                                JSON.stringify(newBg),
+                            );
+                            document.body.style.background = bg_to_css(newBg);
+                        }
+                    }
+
+                    return (
+                        <div className="flex flex-col gap-2">
+                            <div>
+                                <div className="flex gap-2 mb-2 justify-center">
+                                    {modes.map((mode) => (
+                                        <div
+                                            key={mode.key}
+                                            className={`px-3 py-1 rounded cursor-pointer transition ${
+                                                bgMode === mode.key
+                                                    ? "bg-blue-600/40 text-white"
+                                                    : "bg-zinc-700/30 text-zinc-300"
+                                            }`}
+                                            onClick={() =>
+                                                handleTabClick(mode.key)
+                                            }
+                                        >
+                                            {mode.label}
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {bgMode === "solidcolor" && (
+                                <div className="flex flex-col gap-3 bg-zinc-900/40 p-3 rounded">
+                                    <div className="flex items-center gap-3">
+                                        <div className="flex items-center gap-2">
+                                            <input
+                                                data-bg-solid-color
+                                                aria-label="Solid color"
+                                                type="color"
+                                                defaultValue={solidColor}
+                                                className="w-12 h-8 p-0 rounded border border-zinc-700"
+                                                onChange={(e) =>
+                                                    applyColor(e.target.value)
+                                                }
+                                            />
+                                            <input
+                                                data-bg-solid-hex
+                                                aria-label="Hex input"
+                                                type="text"
+                                                defaultValue={solidColor}
+                                                className="bg-transparent border border-zinc-700 rounded px-2 py-1 text-sm w-28"
+                                                onChange={(e) =>
+                                                    applyColor(e.target.value)
+                                                }
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {bgMode === "gradient" && (
+                                <div className="flex flex-col gap-3 bg-zinc-900/40 p-3 rounded">
+                                    <div className="flex flex-col gap-2">
+                                        <label className="text-sm text-zinc-300">
+                                            Angle:{" "}
+                                            <span className="text-xs text-zinc-400 ml-2">
+                                                {gradientAngle}°
+                                            </span>
+                                        </label>
+                                        <input
+                                            data-bg-gradient-angle
+                                            type="range"
+                                            min="0"
+                                            max="360"
+                                            defaultValue={gradientAngle}
+                                            className="w-full"
+                                            onChange={updateGradient}
+                                        />
+                                    </div>
+
+                                    <div className="flex gap-3 items-center">
+                                        <div className="flex items-center gap-2">
+                                            <input
+                                                data-bg-gradient-c1
+                                                type="color"
+                                                defaultValue={gradientColors[0]}
+                                                className="w-10 h-8 rounded border border-zinc-700"
+                                                onChange={updateGradient}
+                                            />
+                                            <input
+                                                type="text"
+                                                defaultValue={gradientColors[0]}
+                                                className="bg-transparent border border-zinc-700 rounded px-2 py-1 text-sm w-28"
+                                                onChange={(e) => {
+                                                    const elC1 =
+                                                        document.querySelector(
+                                                            "[data-bg-gradient-c1]",
+                                                        );
+                                                    if (elC1)
+                                                        elC1.value =
+                                                            e.target.value;
+                                                    updateGradient();
+                                                }}
+                                            />
+                                        </div>
+
+                                        <div className="flex items-center gap-2">
+                                            <input
+                                                data-bg-gradient-c2
+                                                type="color"
+                                                defaultValue={gradientColors[1]}
+                                                className="w-10 h-8 rounded border border-zinc-700"
+                                                onChange={updateGradient}
+                                            />
+                                            <input
+                                                type="text"
+                                                defaultValue={gradientColors[1]}
+                                                className="bg-transparent border border-zinc-700 rounded px-2 py-1 text-sm w-28"
+                                                onChange={(e) => {
+                                                    const elC2 =
+                                                        document.querySelector(
+                                                            "[data-bg-gradient-c2]",
+                                                        );
+                                                    if (elC2)
+                                                        elC2.value =
+                                                            e.target.value;
+                                                    updateGradient();
+                                                }}
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {bgMode === "image" && (
+                                <div className="flex flex-col gap-3 bg-zinc-900/40 p-3 rounded">
+                                    <label className="text-sm text-zinc-300">
+                                        Image URL
+                                    </label>
+                                    <div className="flex gap-2">
+                                        <input
+                                            data-bg-image-url
+                                            type="text"
+                                            placeholder="https://example.com/image.jpg"
+                                            value={inputUrl}
+                                            className="flex-1 bg-transparent border border-zinc-700 rounded px-2 py-1 text-sm"
+                                            onChange={handleImageUrlChange}
+                                        />
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    );
+                }
+
+                createWindow(
+                    "Background",
+                    <BackgroundEditorContent />,
+                    <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="1em"
+                        height="1em"
+                        viewBox="0 0 24 24"
+                    >
+                        <path
+                            fill="currentColor"
+                            d="M12 2C6.49 2 2 6.49 2 12s4.49 10 10 10a2.5 2.5 0 0 0 2.5-2.5c0-.61-.23-1.2-.64-1.67a.53.53 0 0 1-.13-.33c0-.28.22-.5.5-.5H16c3.31 0 6-2.69 6-6c0-4.96-4.49-9-10-9m5.5 11c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5s1.5.67 1.5 1.5s-.67 1.5-1.5 1.5m-3-4c-.83 0-1.5-.67-1.5-1.5S13.67 6 14.5 6s1.5.67 1.5 1.5S15.33 9 14.5 9M5 11.5c0-.83.67-1.5 1.5-1.5s1.5.67 1.5 1.5S7.33 13 6.5 13S5 12.33 5 11.5m6-4c0 .83-.67 1.5-1.5 1.5S8 8.33 8 7.5S8.67 6 9.5 6s1.5.67 1.5 1.5"
+                        />
+                    </svg>,
+                    "edit-bg-window",
+                );
+            }
+
+            function EditModeToggle() {
+                return (
+                    <div
+                        onClick={() => {
+                            isEditMode = !isEditMode;
+                            if (isEditMode) {
+                                openBackgroundEditor();
+                            } else {
+                                windows.forEach((w) => {
+                                    w.closeWindow();
+                                });
+                                windows = [];
+                            }
+                        }}
+                        className="absolute bottom-4 right-4 p-3 bg-zinc-800/30 hover:bg-blue-600/30 backdrop-blur-md rounded-full flex items-center justify-center cursor-pointer"
+                    >
+                        <div className="">
+                            <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                width="20px"
+                                height="20px"
+                                viewBox="0 0 24 24"
+                            >
+                                <path
+                                    fill="currentColor"
+                                    d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75zM20.71 7.04a.996.996 0 0 0 0-1.41l-2.34-2.34a.996.996 0 0 0-1.41 0l-1.83 1.83l3.75 3.75z"
+                                />
+                            </svg>
+                        </div>
+                    </div>
+                );
+            }
+
+            function App() {
+                return (
+                    <>
+                        <EditModeToggle />
+                    </>
+                );
+            }
+
+            ReactDOM.render(<App />, document.getElementById("root"));
+        </script>
+    </body>
+</html>
