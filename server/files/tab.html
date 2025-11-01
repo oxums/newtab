@@ -94,10 +94,66 @@
             const { useState, useEffect, useRef } = React;
 
             let isEditMode = false;
+            let registeredWidgets = {};
 
             document.body.removeAttribute("style");
 
             let bg = localStorage.getItem("prefs_bg") || "";
+            let widgets = JSON.parse(
+                localStorage.getItem("prefs_widgets") || "[]",
+            );
+
+            function saveWidgets() {
+                localStorage.setItem("prefs_widgets", JSON.stringify(widgets));
+            }
+
+            function createWidgetInstance(type, x, y, width, height) {
+                const id = getRandomString();
+                const widgetObj = {
+                    id,
+                    type,
+                    x,
+                    y,
+                    width,
+                    height,
+                    opts: {},
+                };
+                widgets.push(widgetObj);
+                saveWidgets();
+                return widgetObj;
+            }
+
+            function getWidgetInstanceById(id) {
+                return widgets.find((w) => w.id === id);
+            }
+
+            function setWidgetInstanceOpts(id, newOpts) {
+                const widget = getWidgetInstanceById(id);
+                if (widget) {
+                    widget.opts = { ...widget.opts, ...newOpts };
+                    saveWidgets();
+                }
+            }
+
+            function getWidgetInstanceOpts(id) {
+                const widget = getWidgetInstanceById(id);
+                if (widget) {
+                    return widget.opts || {};
+                }
+                return {};
+            }
+
+            function deleteWidgetInstance(id) {
+                widgets = widgets.filter((w) => w.id !== id);
+                saveWidgets();
+            }
+
+            function getRandomString() {
+                return (
+                    Math.random().toString(36).substring(2, 10) +
+                    Math.random().toString(36).substring(2, 10)
+                );
+            }
 
             if (!bg) {
                 bg = JSON.stringify({
@@ -111,7 +167,7 @@
                 if (bg_object.type === "solidcolor") {
                     return bg_object.color;
                 } else if (bg_object.type === "gradient") {
-                  return `linear-gradient(in oklch ${bg_object.angle}deg, ${bg_object.colors.join(", ")})`;
+                    return `linear-gradient(in oklch ${bg_object.angle}deg, ${bg_object.colors.join(", ")})`;
                 } else if (bg_object.type === "image") {
                     return `url(${bg_object.url}) center/cover no-repeat`;
                 } else {
@@ -120,6 +176,79 @@
             }
 
             document.body.style.background = bg_to_css(JSON.parse(bg));
+
+            function registerWidget(
+                id,
+                displayName,
+                component,
+                resizeBounds,
+                initialSize,
+                settings,
+            ) {
+                registeredWidgets[id] = {
+                    displayName,
+                    component,
+                    resizeBounds,
+                    initialSize,
+                    settings,
+                };
+            }
+
+            registerWidget(
+                "text",
+                "Text",
+                ({ opts }) => {
+                    return (
+                        <div
+                            style={{
+                                fontSize: (opts.fontSize || 16) + "px",
+                                color: opts.color || "#ffffff",
+                                fontFamily: opts.font || "Arial, sans-serif",
+                                width: "100%",
+                                height: "100%",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                textAlign: "center",
+                                padding: "4px",
+                                boxSizing: "border-box",
+                            }}
+                        >
+                            {opts.text || "Hello, world!"}
+                        </div>
+                    );
+                },
+                [
+                    [50, 50],
+                    [600, 600],
+                ],
+                [150, 60],
+                {
+                    text: {
+                        type: "string",
+                        label: "Text",
+                        default: "Hello, world!",
+                    },
+                    fontSize: {
+                        type: "number",
+                        typeRefine: "slider",
+                        label: "Font Size",
+                        default: 16,
+                        min: 8,
+                        max: 72,
+                    },
+                    color: {
+                        type: "color",
+                        label: "Color",
+                        default: "#ffffff",
+                    },
+                    font: {
+                        type: "font",
+                        label: "Font",
+                        default: "Arial",
+                    },
+                },
+            );
 
             function EditWindow({ title, icon, content, onClose, onFocus }) {
                 const [pos, setPos] = useState({
@@ -362,6 +491,288 @@
                 );
             }
 
+            function closeWindowById(id) {
+                const winObj = windows.find((w) => w.id === id);
+                if (winObj) {
+                    winObj.closeWindow();
+                }
+            }
+
+            function createWindowFromSettings(window_id, getValue, setValue) {
+                const widget = registeredWidgets[window_id];
+                if (!widget) {
+                    console.error(
+                        `[Newtab] Unknown widget for settings: ${window_id}`,
+                    );
+                    return;
+                }
+
+                function SettingsEditorContent({ onClose }) {
+                    const defs = widget.settings || {};
+                    const [values, setValues] = useState(() => {
+                        const out = {};
+                        for (const k in defs) {
+                            const val = getValue ? getValue(k) : undefined;
+                            out[k] =
+                                val !== undefined && val !== null
+                                    ? val
+                                    : defs[k].default;
+                        }
+                        return out;
+                    });
+
+                    useEffect(() => {
+                        for (const k in values) {
+                            if (setValue) setValue(k, values[k]);
+                        }
+                    }, []);
+
+                    function updateKey(key, newVal) {
+                        setValues((prev) => {
+                            const next = { ...prev, [key]: newVal };
+                            return next;
+                        });
+                        if (setValue) setValue(key, newVal);
+                    }
+
+                    function resetKey(key) {
+                        const def = defs[key];
+                        const dv = def && def.default ? def.default : null;
+                        updateKey(key, dv);
+                    }
+
+                    function renderControl(key) {
+                        const def = defs[key];
+                        const val = values[key];
+
+                        if (!def) return null;
+
+                        if (def.type === "string") {
+                            return (
+                                <div className="flex flex-col gap-2">
+                                    <label className="text-sm text-zinc-300">
+                                        {def.label || key}
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={val || ""}
+                                        className="bg-transparent border border-zinc-700 rounded px-2 py-1 text-sm"
+                                        onChange={(e) =>
+                                            updateKey(key, e.target.value)
+                                        }
+                                    />
+                                </div>
+                            );
+                        }
+
+                        if (def.type === "number") {
+                            if (def.typeRefine === "slider") {
+                                const min =
+                                    typeof def.min === "number" ? def.min : 0;
+                                const max =
+                                    typeof def.max === "number" ? def.max : 100;
+                                return (
+                                    <div className="flex flex-col gap-2">
+                                        <label className="text-sm text-zinc-300">
+                                            {def.label || key}{" "}
+                                            <span className="text-xs text-zinc-400 ml-2">
+                                                {val}
+                                            </span>
+                                        </label>
+                                        <input
+                                            type="range"
+                                            min={min}
+                                            max={max}
+                                            value={val}
+                                            className="w-full"
+                                            onChange={(e) =>
+                                                updateKey(
+                                                    key,
+                                                    Number(e.target.value || 0),
+                                                )
+                                            }
+                                        />
+                                    </div>
+                                );
+                            } else {
+                                return (
+                                    <div className="flex flex-col gap-2">
+                                        <label className="text-sm text-zinc-300">
+                                            {def.label || key}
+                                        </label>
+                                        <input
+                                            type="number"
+                                            value={val}
+                                            className="bg-transparent border border-zinc-700 rounded px-2 py-1 text-sm"
+                                            onChange={(e) =>
+                                                updateKey(
+                                                    key,
+                                                    Number(e.target.value || 0),
+                                                )
+                                            }
+                                        />
+                                    </div>
+                                );
+                            }
+                        }
+
+                        if (def.type === "color") {
+                            return (
+                                <div className="flex items-center gap-2">
+                                    <div className="flex-1">
+                                        <label className="text-sm text-zinc-300 block">
+                                            {def.label || key}
+                                        </label>
+                                        <div className="flex gap-2 items-center mt-1">
+                                            <input
+                                                type="color"
+                                                value={val || "#ffffff"}
+                                                className="w-10 h-8 rounded border border-zinc-700"
+                                                onChange={(e) =>
+                                                    updateKey(
+                                                        key,
+                                                        e.target.value,
+                                                    )
+                                                }
+                                            />
+                                            <input
+                                                type="text"
+                                                value={val || ""}
+                                                className="bg-transparent border border-zinc-700 rounded px-2 py-1 text-sm w-28"
+                                                onChange={(e) =>
+                                                    updateKey(
+                                                        key,
+                                                        e.target.value,
+                                                    )
+                                                }
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        }
+
+                        if (def.type === "font") {
+                            const fonts = [
+                                "Arial",
+                                "Helvetica",
+                                "Times New Roman",
+                                "Courier New",
+                                "Roboto",
+                                "Inter",
+                                "System",
+                            ];
+                            return (
+                                <div className="flex flex-col gap-2">
+                                    <label className="text-sm text-zinc-300">
+                                        {def.label || key}
+                                    </label>
+                                    <select
+                                        value={val || def.default || fonts[0]}
+                                        className="bg-transparent border border-zinc-700 rounded px-2 py-1 text-sm"
+                                        onChange={(e) =>
+                                            updateKey(key, e.target.value)
+                                        }
+                                    >
+                                        {fonts.map((f) => (
+                                            <option key={f} value={f}>
+                                                {f}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                            );
+                        }
+
+                        return (
+                            <div className="flex flex-col gap-2">
+                                <label className="text-sm text-zinc-300">
+                                    {def.label || key}
+                                </label>
+                                <input
+                                    type="text"
+                                    value={String(val ?? "")}
+                                    className="bg-transparent border border-zinc-700 rounded px-2 py-1 text-sm"
+                                    onChange={(e) =>
+                                        updateKey(key, e.target.value)
+                                    }
+                                />
+                            </div>
+                        );
+                    }
+
+                    return (
+                        <div className="flex flex-col gap-3">
+                            <div className="text-sm text-zinc-300">
+                                Editing: {widget.displayName || window_id}
+                            </div>
+
+                            <div className="flex flex-col gap-3 p-2 bg-zinc-900/40 rounded max-h-[360px] overflow-auto">
+                                {Object.keys(defs).length === 0 && (
+                                    <div className="text-sm text-zinc-400">
+                                        No configurable options.
+                                    </div>
+                                )}
+
+                                {Object.keys(defs).map((k) => (
+                                    <div
+                                        key={k}
+                                        className="flex justify-between items-start gap-2"
+                                    >
+                                        <div className="flex-1">
+                                            {renderControl(k)}
+                                        </div>
+                                        <div className="flex flex-col gap-2">
+                                            <button
+                                                className="px-2 py-1 text-xs bg-zinc-700/30 rounded"
+                                                onClick={() => resetKey(k)}
+                                            >
+                                                Reset
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+
+                            <div className="flex gap-2 justify-end">
+                                <button
+                                    className="px-3 py-1 bg-zinc-700/20 rounded"
+                                    onClick={() => {
+                                        // apply current values to external state
+                                        for (const k in values) {
+                                            if (setValue)
+                                                setValue(k, values[k]);
+                                        }
+                                        if (onClose) onClose();
+                                    }}
+                                >
+                                    Close
+                                </button>
+                            </div>
+                        </div>
+                    );
+                }
+
+                createWindow(
+                    widget.displayName
+                        ? `${widget.displayName} Settings`
+                        : `${window_id} Settings`,
+                    <SettingsEditorContent />,
+                    <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="1em"
+                        height="1em"
+                        viewBox="0 0 24 24"
+                    >
+                        <path
+                            fill="currentColor"
+                            d="M12 8a4 4 0 1 0 0 8a4 4 0 0 0 0-8m9.43 3.5l-1.1-.2a7.94 7.94 0 0 0-.7-1.7l.6-1.02l-1.4-1.4l-1.02.6c-.52-.28-1.05-.5-1.6-.7l-.2-1.1H9.5l-.2 1.1c-.55.2-1.08.42-1.6.7L6.58 6.98L5.2 8.4l.6 1.02c-.28.52-.5 1.05-.7 1.6l-1.1.2v2.2l1.1.2c.2.55.42 1.08.7 1.6l-.6 1.02l1.4 1.4l1.02-.6c.52.28 1.05.5 1.6.7l.2 1.1h4.9l.2-1.1c.55-.2 1.08-.42 1.6-.7l1.02.6l1.4-1.4l-.6-1.02c.28-.52.5-1.05.7-1.6l1.1-.2z"
+                        />
+                    </svg>,
+                    `settings-${window_id}`,
+                );
+            }
+
             function openBackgroundEditor() {
                 function BackgroundEditorContent({ onClose }) {
                     const [bgMode, setBgMode] = useState(() => {
@@ -453,7 +864,6 @@
                         document.body.style.background = bg_to_css(newBg);
                     }
 
-                    // Helper to set mode and update prefs_bg immediately
                     function handleTabClick(modeKey) {
                         setBgMode(modeKey);
 
