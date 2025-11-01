@@ -169,6 +169,7 @@
                         { oldOpts, newOpts: widget.opts },
                     );
                     saveWidgets();
+                    updateWidgetRenders();
                 } else {
                     console.warn(
                         `[Newtab] Widget not found for setWidgetInstanceOpts: ${id}`,
@@ -227,6 +228,7 @@
             }
 
             function updateWidgetRenders() {
+                console.log("[Newtab] Updating widget renders...");
                 rerender_widgets();
             }
 
@@ -1537,7 +1539,6 @@
                             setWidgetInstanceOpts(widget.id, {
                                 [k]: v,
                             });
-                            updateWidgetRenders();
                         },
                     );
                 }
@@ -1685,7 +1686,7 @@
                     <>
                         {widgetsState.map((widget, idx) => (
                             <WidgetWrapper
-                                key={idx}
+                                key={[Object.values(widget.opts), idx]}
                                 {...widget}
                                 editMode={editModeState}
                             />
