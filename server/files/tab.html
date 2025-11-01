@@ -125,6 +125,36 @@
                 localStorage.setItem("prefs_widgets", JSON.stringify(widgets));
             }
 
+            function runPlaceholders(text) {
+                if (!text || typeof text !== "string") return text;
+
+                const date = new Date();
+                const placeholders = {
+                    month: date.getMonth() + 1,
+                    day: date.getDate(),
+                    yeay: date.getFullYear(),
+                    h: String(date.getHours()).padStart(2, "0"),
+                    m: String(date.getMinutes()).padStart(2, "0"),
+                    s: String(date.getSeconds()).padStart(2, "0"),
+                    "m-": String(date.getMinutes()),
+                    "s-": String(date.getSeconds()),
+                    "h-": String(date.getHours()),
+                    lang: navigator.language || "en-US",
+                    userAgent: navigator.userAgent,
+                    platform: navigator.platform,
+                    origin: location.origin,
+                };
+
+                let result = text;
+                for (const ph in placeholders) {
+                    result = result.replaceAll(
+                        ph,
+                        "{{" + placeholders[ph] + "}}",
+                    );
+                }
+                return result;
+            }
+
             function createWidgetInstance(type, x, y, width, height) {
                 console.log(
                     `[Newtab] Creating widget instance: type=${type}, x=${x}, y=${y}, width=${width}, height=${height}`,
@@ -239,6 +269,31 @@
                 );
             }
 
+            function updateWidgetSize(id, h, w) {
+                console.log(
+                    `[Newtab] Updating widget size for id: ${id}, width=${w}, height=${h}`,
+                );
+                const widget = getWidgetInstanceById(id);
+                if (widget) {
+                    const oldSize = {
+                        width: widget.width,
+                        height: widget.height,
+                    };
+                    widget.width = w;
+                    widget.height = h;
+                    console.log(`[Newtab] Updated widget size for id: ${id}`, {
+                        oldSize,
+                        newSize: { width: w, height: h },
+                    });
+                    saveWidgets();
+                    updateWidgetRenders();
+                } else {
+                    console.warn(
+                        `[Newtab] Widget not found for updateWidgetSize: ${id}`,
+                    );
+                }
+            }
+
             if (!bg) {
                 bg = JSON.stringify({
                     type: "solidcolor",
@@ -298,13 +353,13 @@
                                 boxSizing: "border-box",
                             }}
                         >
-                            {opts.text || "Hello, world!"}
+                            {runPlaceholders(opts.text) || "Hello, world!"}
                         </div>
                     );
                 },
                 [
-                    [50, 50],
                     [600, 600],
+                    [50, 50],
                 ],
                 [150, 60],
                 {
@@ -312,6 +367,7 @@
                         type: "string",
                         label: "Text",
                         default: "Hello, world!",
+                        placeholders: true,
                     },
                     fontSize: {
                         type: "number",
@@ -634,8 +690,14 @@
                         if (def.type === "string") {
                             return (
                                 <div className="flex flex-col gap-2">
-                                    <label className="text-sm text-zinc-300">
+                                    <label className="text-sm text-zinc-300 gap-2">
                                         {def.label || key}
+
+                                        <p className="text-zinc-400 text-xs">
+                                            {def.placeholders
+                                                ? "(supports {{placeholders}})"
+                                                : ""}
+                                        </p>
                                     </label>
                                     <input
                                         type="text"
@@ -1452,6 +1514,7 @@
                 }, [widget.id]);
 
                 const dragRef = React.useRef(null);
+                const resizeRef = React.useRef(null);
 
                 function onDragStart(e) {
                     if (e.button === 2) return;
@@ -1503,6 +1566,87 @@
                     window.removeEventListener("mouseup", onDragEnd);
                     window.removeEventListener("touchmove", onDragMove);
                     window.removeEventListener("touchend", onDragEnd);
+                    if (e.preventDefault) e.preventDefault();
+                }
+
+                function onResizeStart(e) {
+                    if (e.button === 2) return;
+                    const startPoint = getPointFromEvent(e);
+                    resizeRef.current = {
+                        resizing: true,
+                        startX: startPoint.x,
+                        startY: startPoint.y,
+                        origWidth: widget.width,
+                        origHeight: widget.height,
+                    };
+
+                    document.body.style.userSelect = "none";
+
+                    window.addEventListener("mousemove", onResizeMove);
+                    window.addEventListener("mouseup", onResizeEnd);
+                    window.addEventListener("touchmove", onResizeMove, {
+                        passive: false,
+                    });
+                    window.addEventListener("touchend", onResizeEnd);
+
+                    if (e.preventDefault) e.preventDefault();
+                }
+
+                function onResizeMove(e) {
+                    if (!resizeRef.current || !resizeRef.current.resizing)
+                        return;
+                    const point = getPointFromEvent(e);
+                    const dx = point.x - resizeRef.current.startX;
+                    const dy = point.y - resizeRef.current.startY;
+
+                    const bounds = registeredWidgets[widget.type]?.bounds || [
+                        [800, 600],
+                        [50, 30],
+                    ];
+                    const [[maxWidth, maxHeight], [minWidth, minHeight]] =
+                        bounds;
+
+                    const newWidth = Math.max(
+                        minWidth,
+                        resizeRef.current.origWidth + dx,
+                    );
+                    const newHeight = Math.max(
+                        minHeight,
+                        resizeRef.current.origHeight + dy,
+                    );
+
+                    const availableWidth =
+                        window.innerWidth -
+                        (widget.x / 100) * window.innerWidth;
+                    const availableHeight =
+                        window.innerHeight -
+                        (widget.y / 100) * window.innerHeight;
+
+                    const clampedWidth = Math.min(
+                        newWidth,
+                        Math.min(maxWidth, availableWidth),
+                    );
+                    const clampedHeight = Math.min(
+                        newHeight,
+                        Math.min(maxHeight, availableHeight),
+                    );
+
+                    updateWidgetSize(widget.id, clampedHeight, clampedWidth);
+                    updateWidgetRenders();
+
+                    if (e.preventDefault) e.preventDefault();
+                }
+
+                function onResizeEnd(e) {
+                    document.body.style.userSelect = "";
+                    resizeRef.current = {
+                        ...resizeRef.current,
+                        resizing: false,
+                    };
+                    window.removeEventListener("mousemove", onResizeMove);
+                    window.removeEventListener("mouseup", onResizeEnd);
+                    window.removeEventListener("touchmove", onResizeMove);
+                    window.removeEventListener("touchend", onResizeEnd);
                     if (e.preventDefault) e.preventDefault();
                 }
 
@@ -1567,7 +1711,7 @@
                 return (
                     <div
                         id={"widget_" + widget.id}
-                        className="newtab__widget absolute"
+                        className={`newtab__widget absolute ${widget.editMode ? "border-2 border-blue-500/50" : ""}`}
                         style={{
                             left: widget.x + "%",
                             top: widget.y + "%",
@@ -1659,6 +1803,19 @@
                                     </svg>
                                 </div>
                             </div>
+                        )}
+
+                        {widget.editMode && (
+                            <div
+                                className="absolute bottom-0 right-0 w-4 h-4 bg-blue-500/50 cursor-nw-resize"
+                                onMouseDown={onResizeStart}
+                                onTouchStart={onResizeStart}
+                                title="Resize"
+                                style={{
+                                    clipPath:
+                                        "polygon(100% 0, 0 100%, 100% 100%)",
+                                }}
+                            />
                         )}
 
                         <WidgetComp opts={opts} />
