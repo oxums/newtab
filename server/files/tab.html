@@ -91,10 +91,16 @@
     >
         <div id="root"></div>
         <script defer type="text/babel">
+            // All widget positions are stored as percentages of the width/height of the window
             const { useState, useEffect, useRef } = React;
 
             let isEditMode = false;
+
             let registeredWidgets = {};
+
+            let rerender_widgets = () => {
+                console.warn("[Newtab] Rerender not ready!");
+            };
 
             document.body.removeAttribute("style");
 
@@ -103,11 +109,26 @@
                 localStorage.getItem("prefs_widgets") || "[]",
             );
 
+            function pixelsToPercentX(px) {
+                return (px / window.innerWidth) * 100;
+            }
+
+            function pixelsToPercentY(px) {
+                return (px / window.innerHeight) * 100;
+            }
+
             function saveWidgets() {
+                console.log(
+                    "[Newtab] Saving widgets to localStorage:",
+                    widgets,
+                );
                 localStorage.setItem("prefs_widgets", JSON.stringify(widgets));
             }
 
             function createWidgetInstance(type, x, y, width, height) {
+                console.log(
+                    `[Newtab] Creating widget instance: type=${type}, x=${x}, y=${y}, width=${width}, height=${height}`,
+                );
                 const id = getRandomString();
                 const widgetObj = {
                     id,
@@ -119,33 +140,94 @@
                     opts: {},
                 };
                 widgets.push(widgetObj);
+                console.log(
+                    `[Newtab] Created widget instance with id: ${id}`,
+                    widgetObj,
+                );
                 saveWidgets();
                 return widgetObj;
             }
 
             function getWidgetInstanceById(id) {
-                return widgets.find((w) => w.id === id);
+                console.log(`[Newtab] Getting widget instance by id: ${id}`);
+                const widget = widgets.find((w) => w.id === id);
+                console.log(`[Newtab] Found widget:`, widget);
+                return widget;
             }
 
             function setWidgetInstanceOpts(id, newOpts) {
+                console.log(
+                    `[Newtab] Setting widget options for id: ${id}`,
+                    newOpts,
+                );
                 const widget = getWidgetInstanceById(id);
                 if (widget) {
+                    const oldOpts = { ...widget.opts };
                     widget.opts = { ...widget.opts, ...newOpts };
+                    console.log(
+                        `[Newtab] Updated widget options for id: ${id}`,
+                        { oldOpts, newOpts: widget.opts },
+                    );
                     saveWidgets();
+                } else {
+                    console.warn(
+                        `[Newtab] Widget not found for setWidgetInstanceOpts: ${id}`,
+                    );
+                }
+            }
+
+            function updateWidgetPosition(id, x, y) {
+                console.log(
+                    `[Newtab] Updating widget position for id: ${id}, x=${x}, y=${y}`,
+                );
+                const widget = getWidgetInstanceById(id);
+                if (widget) {
+                    const oldPosition = { x: widget.x, y: widget.y };
+                    widget.x = x;
+                    widget.y = y;
+                    console.log(
+                        `[Newtab] Updated widget position for id: ${id}`,
+                        { oldPosition, newPosition: { x, y } },
+                    );
+                    saveWidgets();
+                } else {
+                    console.warn(
+                        `[Newtab] Widget not found for updateWidgetPosition: ${id}`,
+                    );
                 }
             }
 
             function getWidgetInstanceOpts(id) {
+                console.log(`[Newtab] Getting widget options for id: ${id}`);
                 const widget = getWidgetInstanceById(id);
                 if (widget) {
-                    return widget.opts || {};
+                    const opts = widget.opts || {};
+                    console.log(
+                        `[Newtab] Retrieved widget options for id: ${id}`,
+                        opts,
+                    );
+                    return opts;
                 }
+                console.warn(
+                    `[Newtab] Widget not found for getWidgetInstanceOpts: ${id}`,
+                );
                 return {};
             }
 
             function deleteWidgetInstance(id) {
+                console.log(`[Newtab] Deleting widget instance with id: ${id}`);
+                const initialCount = widgets.length;
                 widgets = widgets.filter((w) => w.id !== id);
+                const deletedCount = initialCount - widgets.length;
+                console.log(
+                    `[Newtab] Deleted ${deletedCount} widget(s) with id: ${id}. Remaining widgets:`,
+                    widgets.length,
+                );
                 saveWidgets();
+            }
+
+            function updateWidgetRenders() {
+                rerender_widgets();
             }
 
             function getRandomString() {
@@ -498,16 +580,16 @@
                 }
             }
 
-            function createWindowFromSettings(window_id, getValue, setValue) {
-                const widget = registeredWidgets[window_id];
+            function createWindowFromSettings(widget_type, getValue, setValue) {
+                const widget = registeredWidgets[widget_type];
                 if (!widget) {
                     console.error(
-                        `[Newtab] Unknown widget for settings: ${window_id}`,
+                        `[Newtab] Unknown widget for settings: ${widget_type}`,
                     );
                     return;
                 }
 
-                function SettingsEditorContent({ onClose }) {
+                function SettingsEditorContent() {
                     const defs = widget.settings || {};
                     const [values, setValues] = useState(() => {
                         const out = {};
@@ -703,10 +785,6 @@
 
                     return (
                         <div className="flex flex-col gap-3">
-                            <div className="text-sm text-zinc-300">
-                                Editing: {widget.displayName || window_id}
-                            </div>
-
                             <div className="flex flex-col gap-3 p-2 bg-zinc-900/40 rounded max-h-[360px] overflow-auto">
                                 {Object.keys(defs).length === 0 && (
                                     <div className="text-sm text-zinc-400">
@@ -724,7 +802,7 @@
                                         </div>
                                         <div className="flex flex-col gap-2">
                                             <button
-                                                className="px-2 py-1 text-xs bg-zinc-700/30 rounded"
+                                                className="px-2 py-1 text-xs bg-zinc-700/30 rounded cursor-pointer"
                                                 onClick={() => resetKey(k)}
                                             >
                                                 Reset
@@ -733,22 +811,6 @@
                                     </div>
                                 ))}
                             </div>
-
-                            <div className="flex gap-2 justify-end">
-                                <button
-                                    className="px-3 py-1 bg-zinc-700/20 rounded"
-                                    onClick={() => {
-                                        // apply current values to external state
-                                        for (const k in values) {
-                                            if (setValue)
-                                                setValue(k, values[k]);
-                                        }
-                                        if (onClose) onClose();
-                                    }}
-                                >
-                                    Close
-                                </button>
-                            </div>
                         </div>
                     );
                 }
@@ -756,20 +818,10 @@
                 createWindow(
                     widget.displayName
                         ? `${widget.displayName} Settings`
-                        : `${window_id} Settings`,
+                        : `${widget_type} Settings`,
                     <SettingsEditorContent />,
-                    <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        width="1em"
-                        height="1em"
-                        viewBox="0 0 24 24"
-                    >
-                        <path
-                            fill="currentColor"
-                            d="M12 8a4 4 0 1 0 0 8a4 4 0 0 0 0-8m9.43 3.5l-1.1-.2a7.94 7.94 0 0 0-.7-1.7l.6-1.02l-1.4-1.4l-1.02.6c-.52-.28-1.05-.5-1.6-.7l-.2-1.1H9.5l-.2 1.1c-.55.2-1.08.42-1.6.7L6.58 6.98L5.2 8.4l.6 1.02c-.28.52-.5 1.05-.7 1.6l-1.1.2v2.2l1.1.2c.2.55.42 1.08.7 1.6l-.6 1.02l1.4 1.4l1.02-.6c.52.28 1.05.5 1.6.7l.2 1.1h4.9l.2-1.1c.55-.2 1.08-.42 1.6-.7l1.02.6l1.4-1.4l-.6-1.02c.28-.52.5-1.05.7-1.6l1.1-.2z"
-                        />
-                    </svg>,
-                    `settings-${window_id}`,
+                    null,
+                    `settings-${widget_type}`,
                 );
             }
 
@@ -897,7 +949,7 @@
                     return (
                         <div className="flex flex-col gap-2">
                             <div>
-                                <div className="flex gap-2 mb-2 justify-center">
+                                <div className="flex gap-2 my-1 justify-center">
                                     {modes.map((mode) => (
                                         <div
                                             key={mode.key}
@@ -1058,13 +1110,297 @@
                 );
             }
 
-            function EditModeToggle() {
+            function openWidgetCreator() {
+                function WidgetCreator() {
+                    const [_, setTick] = React.useState(0);
+                    const dragStateRef = React.useRef({
+                        dragging: false,
+                        widgetKey: null,
+                        startX: 0,
+                        startY: 0,
+                        lastX: 0,
+                        lastY: 0,
+                        windowRect: null,
+                        previewContainer: null,
+                        previewShown: false,
+                    });
+
+                    useEffectCleanup();
+
+                    function useEffectCleanup() {
+                        React.useEffect(() => {
+                            return () => {
+                                const st = dragStateRef.current;
+                                if (st.previewContainer) {
+                                    try {
+                                        ReactDOM.unmountComponentAtNode(
+                                            st.previewContainer,
+                                        );
+                                        document.body.removeChild(
+                                            st.previewContainer,
+                                        );
+                                    } catch (e) {}
+                                    st.previewContainer = null;
+                                    st.previewShown = false;
+                                }
+                                st.dragging = false;
+                                st.widgetKey = null;
+                            };
+                        }, []);
+                    }
+
+                    function onPointerDown(e, w) {
+                        if (e.button === 2) return;
+                        const st = dragStateRef.current;
+                        st.dragging = true;
+                        st.widgetKey = w;
+                        const point = getPointFromEvent(e);
+                        st.startX = point.x;
+                        st.startY = point.y;
+                        st.lastX = point.x;
+                        st.lastY = point.y;
+
+                        const el =
+                            (e.currentTarget &&
+                                e.currentTarget.closest &&
+                                e.currentTarget.closest(".window")) ||
+                            null;
+                        st.windowRect = el ? el.getBoundingClientRect() : null;
+
+                        window.addEventListener("mousemove", onPointerMove);
+                        window.addEventListener("mouseup", onPointerUp);
+                        window.addEventListener("touchmove", onPointerMove, {
+                            passive: false,
+                        });
+                        window.addEventListener("touchend", onPointerUp);
+
+                        if (e.preventDefault) e.preventDefault();
+                    }
+
+                    function onPointerMove(e) {
+                        const st = dragStateRef.current;
+                        if (!st.dragging) return;
+                        const point = getPointFromEvent(e);
+                        st.lastX = point.x;
+                        st.lastY = point.y;
+
+                        const leftWindow =
+                            st.windowRect &&
+                            (point.x < st.windowRect.left ||
+                                point.x > st.windowRect.right ||
+                                point.y < st.windowRect.top ||
+                                point.y > st.windowRect.bottom);
+
+                        if (leftWindow && !st.previewShown) {
+                            showPreviewAt(point.x, point.y, st.widgetKey);
+                            st.previewShown = true;
+                        } else if (!leftWindow && st.previewShown) {
+                            removePreview();
+                            st.previewShown = false;
+                        } else if (st.previewShown) {
+                            updatePreviewPosition(point.x, point.y);
+                        }
+
+                        if (e.preventDefault) e.preventDefault();
+                    }
+
+                    function onPointerUp(e) {
+                        const st = dragStateRef.current;
+                        if (!st.dragging) return;
+                        const point = getPointFromEvent(e);
+
+                        if (st.previewShown && st.previewContainer) {
+                            const size = getWidgetSize(st.widgetKey);
+                            const left = point.x - size[0] / 2;
+                            const top = point.y - size[1] / 2;
+
+                            createWidgetInstance(
+                                st.widgetKey,
+                                pixelsToPercentX(Math.max(0, Math.round(left))),
+                                pixelsToPercentY(Math.max(0, Math.round(top))),
+                                size[0],
+                                size[1],
+                            );
+
+                            removePreview();
+                            updateWidgetRenders();
+                        } else {
+                            const size = getWidgetSize(st.widgetKey);
+                            const maxX = Math.max(
+                                window.innerWidth - size[0],
+                                0,
+                            );
+                            const maxY = Math.max(
+                                window.innerHeight - size[1],
+                                0,
+                            );
+                            const randLeft = Math.round(Math.random() * maxX);
+                            const randTop = Math.round(Math.random() * maxY);
+
+                            createWidgetInstance(
+                                st.widgetKey,
+                                pixelsToPercentX(randLeft),
+                                pixelsToPercentY(randTop),
+                                size[0],
+                                size[1],
+                            );
+                        }
+
+                        cleanupListeners();
+                        st.dragging = false;
+                        st.widgetKey = null;
+                        st.previewShown = false;
+                        if (e.preventDefault) e.preventDefault();
+                    }
+
+                    function cleanupListeners() {
+                        window.removeEventListener("mousemove", onPointerMove);
+                        window.removeEventListener("mouseup", onPointerUp);
+                        window.removeEventListener("touchmove", onPointerMove);
+                        window.removeEventListener("touchend", onPointerUp);
+                    }
+
+                    function getPointFromEvent(e) {
+                        if (e.type && e.type.startsWith("touch")) {
+                            const t =
+                                e.touches && e.touches[0]
+                                    ? e.touches[0]
+                                    : e.changedTouches && e.changedTouches[0]
+                                      ? e.changedTouches[0]
+                                      : null;
+                            return {
+                                x: t ? t.clientX : 0,
+                                y: t ? t.clientY : 0,
+                            };
+                        } else {
+                            return { x: e.clientX, y: e.clientY };
+                        }
+                    }
+
+                    function getWidgetSize(w) {
+                        const def = registeredWidgets[w];
+                        if (!def) return [150, 60];
+                        const s = def.initialSize || [150, 60];
+                        return [s[0] || 150, s[1] || 60];
+                    }
+
+                    function showPreviewAt(x, y, w) {
+                        removePreview();
+                        const size = getWidgetSize(w);
+                        const container = document.createElement("div");
+                        container.style.position = "fixed";
+                        container.style.left = "0px";
+                        container.style.top = "0px";
+                        container.style.width = size[0] + "px";
+                        container.style.height = size[1] + "px";
+                        container.style.pointerEvents = "none";
+                        container.style.opacity = "0.65";
+                        container.style.transform = `translate(${x - size[0] / 2}px, ${y - size[1] / 2}px)`;
+                        container.style.zIndex = "2000";
+                        document.body.appendChild(container);
+
+                        const WidgetComp = registeredWidgets[w].component;
+                        try {
+                            ReactDOM.render(
+                                React.createElement(WidgetComp, {
+                                    opts: getWidgetInstanceOpts(w) || {},
+                                }),
+                                container,
+                            );
+                        } catch (e) {
+                            container.textContent =
+                                registeredWidgets[w].displayName || w;
+                            container.style.display = "flex";
+                            container.style.alignItems = "center";
+                            container.style.justifyContent = "center";
+                            container.style.background =
+                                "rgba(255,255,255,0.04)";
+                            container.style.color = "#fff";
+                            container.style.borderRadius = "6px";
+                            container.style.padding = "4px";
+                            container.style.boxSizing = "border-box";
+                        }
+
+                        dragStateRef.current.previewContainer = container;
+                        dragStateRef.current.previewShown = true;
+                    }
+
+                    function updatePreviewPosition(x, y) {
+                        const st = dragStateRef.current;
+                        if (!st.previewContainer) return;
+                        const size = getWidgetSize(st.widgetKey);
+                        st.previewContainer.style.transform = `translate(${x - size[0] / 2}px, ${y - size[1] / 2}px)`;
+                    }
+
+                    function removePreview() {
+                        const st = dragStateRef.current;
+                        if (st.previewContainer) {
+                            try {
+                                ReactDOM.unmountComponentAtNode(
+                                    st.previewContainer,
+                                );
+                                if (st.previewContainer.parentNode)
+                                    st.previewContainer.parentNode.removeChild(
+                                        st.previewContainer,
+                                    );
+                            } catch (e) {}
+                            st.previewContainer = null;
+                            st.previewShown = false;
+                        }
+                    }
+
+                    return (
+                        <div className="grid grid-col grid-cols-2">
+                            {Object.keys(registeredWidgets).map((w) => (
+                                <div
+                                    key={w}
+                                    className="flex flex-col items-center p-3 m-2 bg-zinc-800/30 hover:bg-zinc-700/40 rounded cursor-grab"
+                                    onMouseDown={(e) => onPointerDown(e, w)}
+                                    onTouchStart={(e) => onPointerDown(e, w)}
+                                    role="button"
+                                >
+                                    <div className="text-sm text-center select-none">
+                                        {registeredWidgets[w].displayName || w}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    );
+                }
+
+                createWindow(
+                    "New widget",
+                    <WidgetCreator />,
+                    <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="1em"
+                        height="1em"
+                        viewBox="0 0 24 24"
+                    >
+                        <g
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            stroke-width="2"
+                        >
+                            <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" />
+                            <path d="m3.3 7l8.7 5l8.7-5M12 22V12" />
+                        </g>
+                    </svg>,
+                    "new-widget-window",
+                );
+            }
+
+            function EditModeToggle({ editModeSetState }) {
                 return (
                     <div
                         onClick={() => {
                             isEditMode = !isEditMode;
+                            editModeSetState(isEditMode);
                             if (isEditMode) {
                                 openBackgroundEditor();
+                                openWidgetCreator();
                             } else {
                                 windows.forEach((w) => {
                                     w.closeWindow();
@@ -1091,10 +1427,270 @@
                 );
             }
 
+            function WidgetWrapper(widget) {
+                const [opts, setOpts] = useState(() => {
+                    return getWidgetInstanceOpts(widget.id) || {};
+                });
+
+                useEffect(() => {
+                    function handleStorageEvent(e) {
+                        if (e.key === `widget_opts_${widget.id}`) {
+                            const newOpts =
+                                getWidgetInstanceOpts(widget.id) || {};
+                            setOpts(newOpts);
+                        }
+                    }
+                    window.addEventListener("storage", handleStorageEvent);
+                    return () => {
+                        window.removeEventListener(
+                            "storage",
+                            handleStorageEvent,
+                        );
+                    };
+                }, [widget.id]);
+
+                const dragRef = React.useRef(null);
+
+                function onDragStart(e) {
+                    if (e.button === 2) return;
+                    const startPoint = getPointFromEvent(e);
+                    dragRef.current = {
+                        dragging: true,
+                        startX: startPoint.x,
+                        startY: startPoint.y,
+                        origX: widget.x,
+                        origY: widget.y,
+                        width: widget.width,
+                        height: widget.height,
+                    };
+
+                    document.body.style.userSelect = "none";
+
+                    window.addEventListener("mousemove", onDragMove);
+                    window.addEventListener("mouseup", onDragEnd);
+                    window.addEventListener("touchmove", onDragMove, {
+                        passive: false,
+                    });
+                    window.addEventListener("touchend", onDragEnd);
+
+                    if (e.preventDefault) e.preventDefault();
+                }
+
+                function onDragMove(e) {
+                    if (!dragRef.current || !dragRef.current.dragging) return;
+                    const point = getPointFromEvent(e);
+                    const dx = point.x - dragRef.current.startX;
+                    const dy = point.y - dragRef.current.startY;
+
+                    const newX = dragRef.current.origX + pixelsToPercentX(dx);
+                    const newY = dragRef.current.origY + pixelsToPercentY(dy);
+
+                    const clampedX = Math.max(0, Math.min(newX, 100));
+                    const clampedY = Math.max(0, Math.min(newY, 100));
+
+                    updateWidgetPosition(widget.id, clampedX, clampedY);
+                    updateWidgetRenders();
+
+                    if (e.preventDefault) e.preventDefault();
+                }
+
+                function onDragEnd(e) {
+                    document.body.style.userSelect = "";
+                    dragRef.current = { ...dragRef.current, dragging: false };
+                    window.removeEventListener("mousemove", onDragMove);
+                    window.removeEventListener("mouseup", onDragEnd);
+                    window.removeEventListener("touchmove", onDragMove);
+                    window.removeEventListener("touchend", onDragEnd);
+                    if (e.preventDefault) e.preventDefault();
+                }
+
+                function getPointFromEvent(e) {
+                    if (e.type && e.type.startsWith("touch")) {
+                        const t =
+                            e.touches && e.touches[0]
+                                ? e.touches[0]
+                                : e.changedTouches && e.changedTouches[0]
+                                  ? e.changedTouches[0]
+                                  : null;
+                        return {
+                            x: t ? t.clientX : 0,
+                            y: t ? t.clientY : 0,
+                        };
+                    } else {
+                        return { x: e.clientX || 0, y: e.clientY || 0 };
+                    }
+                }
+
+                function onDeleteClick(e) {
+                    if (e.preventDefault) e.preventDefault();
+                    deleteWidgetInstance(widget.id);
+                    updateWidgetRenders();
+                }
+
+                function onEditClick(e) {
+                    if (e.preventDefault) e.preventDefault();
+                    createWindowFromSettings(
+                        widget.type,
+                        (k) => opts[k],
+                        (k, v) => {
+                            console.log("Value change:", k, "to", v);
+                            setWidgetInstanceOpts(widget.id, {
+                                [k]: v,
+                            });
+                            updateWidgetRenders();
+                        },
+                    );
+                }
+
+                const WidgetComp = registeredWidgets[widget.type].component;
+                if (!WidgetComp) {
+                    console.error(
+                        `Widget component is undefined for widget:`,
+                        widget,
+                    );
+                    return (
+                        <div
+                            id={"widget_" + widget.id}
+                            className="newtab__widget absolute"
+                            style={{
+                                left: widget.x + "%",
+                                top: widget.y + "%",
+                                width: widget.width + "px",
+                                height: widget.height + "px",
+                            }}
+                        >
+                            Error: Widget component not found
+                        </div>
+                    );
+                }
+                return (
+                    <div
+                        id={"widget_" + widget.id}
+                        className="newtab__widget absolute"
+                        style={{
+                            left: widget.x + "%",
+                            top: widget.y + "%",
+                            width: widget.width + "px",
+                            height: widget.height + "px",
+                        }}
+                    >
+                        {widget.editMode && (
+                            <div className="absolute flex gap-1 top-0 right-1 z-10 bg-black/40 rounded p-1">
+                                <div
+                                    className="newtab_widget_edit cursor-pointer"
+                                    onClick={onEditClick}
+                                    title="Settings"
+                                    style={{
+                                        display: "flex",
+                                        alignItems: "center",
+                                    }}
+                                >
+                                    <svg
+                                        xmlns="http://www.w3.org/2000/svg"
+                                        width="1em"
+                                        height="1em"
+                                        viewBox="0 0 24 24"
+                                    >
+                                        <g
+                                            fill="none"
+                                            stroke="currentColor"
+                                            stroke-linecap="round"
+                                            stroke-linejoin="round"
+                                            stroke-width="2"
+                                        >
+                                            <path d="M11 10.27L7 3.34m4 10.39l-4 6.93M12 22v-2m0-18v2m2 8h8m-5 8.66l-1-1.73m1-15.59l-1 1.73M2 12h2m16.66 5l-1.73-1m1.73-9l-1.73 1M3.34 17l1.73-1M3.34 7l1.73 1" />
+                                            <circle cx="12" cy="12" r="2" />
+                                            <circle cx="12" cy="12" r="8" />
+                                        </g>
+                                    </svg>
+                                </div>
+
+                                <div
+                                    className="newtab_widget_delete cursor-pointer"
+                                    onClick={onDeleteClick}
+                                    title="Delete"
+                                    style={{
+                                        display: "flex",
+                                        alignItems: "center",
+                                    }}
+                                >
+                                    <svg
+                                        xmlns="http://www.w3.org/2000/svg"
+                                        width="1em"
+                                        height="1em"
+                                        viewBox="0 0 24 24"
+                                    >
+                                        <path
+                                            fill="none"
+                                            stroke="currentColor"
+                                            stroke-linecap="round"
+                                            stroke-linejoin="round"
+                                            stroke-width="2"
+                                            d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"
+                                        />
+                                    </svg>
+                                </div>
+
+                                <div
+                                    className="newtab_widget_drag_handle cursor-grab"
+                                    onMouseDown={onDragStart}
+                                    onTouchStart={onDragStart}
+                                    title="Drag"
+                                    style={{
+                                        display: "flex",
+                                        alignItems: "center",
+                                    }}
+                                >
+                                    <svg
+                                        xmlns="http://www.w3.org/2000/svg"
+                                        width="1em"
+                                        height="1em"
+                                        viewBox="0 0 24 24"
+                                    >
+                                        <path
+                                            fill="none"
+                                            stroke="currentColor"
+                                            stroke-linecap="round"
+                                            stroke-linejoin="round"
+                                            stroke-width="2.5"
+                                            d="M8 6h.006M8 12h.006M8 18h.006m7.988-12H16m-.006 6H16m-.006 6H16"
+                                        />
+                                    </svg>
+                                </div>
+                            </div>
+                        )}
+
+                        <WidgetComp opts={opts} />
+                    </div>
+                );
+            }
+
             function App() {
+                const [editModeState, setEditModeState] = useState(false);
+                const [widgetsState, setWidgetsState] = useState(widgets);
+
+                useEffect(() => {
+                    rerender_widgets = () => {
+                        setWidgetsState([...widgets]);
+                    };
+
+                    return () => {
+                        rerender_widgets = () => {
+                            console.warn("[Newtab] Component unmounted.");
+                        };
+                    };
+                }, []);
+
                 return (
                     <>
-                        <EditModeToggle />
+                        {widgetsState.map((widget, idx) => (
+                            <WidgetWrapper
+                                key={idx}
+                                {...widget}
+                                editMode={editModeState}
+                            />
+                        ))}
+                        <EditModeToggle editModeSetState={setEditModeState} />
                     </>
                 );
             }
