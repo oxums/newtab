@@ -38,6 +38,10 @@
             option {
                 color: black;
             }
+
+            button {
+                cursor: pointer;
+            }
         </style>
         <div id="__newtab_scripts"></div>
         <script>
@@ -570,16 +574,30 @@
                                 month: "2-digit",
                                 day: "2-digit",
                             };
-                            
-                            const parts = new Intl.DateTimeFormat("en-US", options).formatToParts(date);
-                            let h = 0, m = 0, s = 0, year = 0, month = 0, day = 0;
+
+                            const parts = new Intl.DateTimeFormat(
+                                "en-US",
+                                options,
+                            ).formatToParts(date);
+                            let h = 0,
+                                m = 0,
+                                s = 0,
+                                year = 0,
+                                month = 0,
+                                day = 0;
                             for (const part of parts) {
-                                if (part.type === "hour") h = parseInt(part.value, 10);
-                                if (part.type === "minute") m = parseInt(part.value, 10);
-                                if (part.type === "second") s = parseInt(part.value, 10);
-                                if (part.type === "year") year = parseInt(part.value, 10);
-                                if (part.type === "month") month = parseInt(part.value, 10);
-                                if (part.type === "day") day = parseInt(part.value, 10);
+                                if (part.type === "hour")
+                                    h = parseInt(part.value, 10);
+                                if (part.type === "minute")
+                                    m = parseInt(part.value, 10);
+                                if (part.type === "second")
+                                    s = parseInt(part.value, 10);
+                                if (part.type === "year")
+                                    year = parseInt(part.value, 10);
+                                if (part.type === "month")
+                                    month = parseInt(part.value, 10);
+                                if (part.type === "day")
+                                    day = parseInt(part.value, 10);
                             }
                             d = { h, m, s, year, month, day };
                         } else {
@@ -1420,6 +1438,2262 @@
                 },
             );
 
+            registerWidget(
+                "favourites",
+                "Favourites",
+                ({ opts }) => {
+                    const loadFavs = () => {
+                        try {
+                            return JSON.parse(
+                                localStorage.getItem("prefs_favourites") ||
+                                    "[]",
+                            );
+                        } catch (e) {
+                            return [];
+                        }
+                    };
+
+                    const saveFavs = (arr) => {
+                        localStorage.setItem(
+                            "prefs_favourites",
+                            JSON.stringify(arr),
+                        );
+
+                        try {
+                            window.dispatchEvent(
+                                new Event("favourites:updated"),
+                            );
+                        } catch (e) {}
+                    };
+
+                    const [favs, setFavs] = useState(() => loadFavs());
+                    const [searchLocal, setSearchLocal] = useState(
+                        opts.search || "",
+                    );
+
+                    useEffect(() => {
+                        function onUpdate() {
+                            setFavs(loadFavs());
+                        }
+                        window.addEventListener("favourites:updated", onUpdate);
+                        return () =>
+                            window.removeEventListener(
+                                "favourites:updated",
+                                onUpdate,
+                            );
+                    }, []);
+
+                    const search = (opts.search || searchLocal || "").trim();
+                    const filteredFavs = search
+                        ? favs.filter(
+                              (f) =>
+                                  (f.title || "")
+                                      .toLowerCase()
+                                      .includes(search.toLowerCase()) ||
+                                  (f.url || "")
+                                      .toLowerCase()
+                                      .includes(search.toLowerCase()),
+                          )
+                        : favs;
+
+                    const itemBgColor = opts.itemBgColor || "#222222";
+                    const itemBgOpacity =
+                        opts.itemBgOpacity !== undefined
+                            ? opts.itemBgOpacity / 100
+                            : 1;
+                    const itemTextColor = opts.color || "#ffffff";
+                    const itemTextOpacity =
+                        opts.itemTextOpacity !== undefined
+                            ? opts.itemTextOpacity / 100
+                            : 1;
+                    const itemBorderRadius =
+                        opts.itemBorderRadius !== undefined
+                            ? opts.itemBorderRadius
+                            : opts.borderRadius !== undefined
+                              ? opts.borderRadius
+                              : 8;
+                    const itemPadding =
+                        opts.itemPadding !== undefined ? opts.itemPadding : 8;
+                    const itemSize =
+                        opts.itemSize !== undefined ? opts.itemSize : 120;
+                    const itemBoxShadow = opts.itemBoxShadow
+                        ? opts.itemBoxShadow
+                        : "0 1px 4px rgba(0,0,0,0.3)";
+
+                    const plusBg = opts.plusBgColor || "#2563eb";
+                    const plusColor = opts.plusColor || "#fff";
+                    const plusSize = opts.plusSize || 28;
+                    const plusBorderRadius =
+                        opts.plusBorderRadius !== undefined
+                            ? opts.plusBorderRadius
+                            : 6;
+                    const plusShowLabel =
+                        opts.plusShowLabel !== undefined
+                            ? opts.plusShowLabel
+                            : false;
+                    const plusHideIcon =
+                        opts.plusHideIcon !== undefined
+                            ? opts.plusHideIcon
+                            : false;
+                    const plusWidth =
+                        opts.plusWidth !== undefined ? opts.plusWidth : null;
+                    const plusHeight =
+                        opts.plusHeight !== undefined ? opts.plusHeight : null;
+
+                    const showEditButton = opts.showEditButton !== false;
+                    const editBgColor =
+                        opts.editBgColor || "rgba(255,255,255,0.06)";
+                    const editBgOpacity =
+                        opts.editBgOpacity !== undefined
+                            ? opts.editBgOpacity / 100
+                            : 1;
+                    const editColor = opts.editColor || "#fff";
+                    const editSize = opts.editSize || 13;
+                    const editBorderRadius =
+                        opts.editBorderRadius !== undefined
+                            ? opts.editBorderRadius
+                            : 6;
+                    const editPadding =
+                        opts.editPadding !== undefined ? opts.editPadding : 4;
+                    const editOpacity =
+                        opts.editOpacity !== undefined
+                            ? opts.editOpacity / 100
+                            : 1;
+                    const editBlur =
+                        opts.editBlur !== undefined ? opts.editBlur : 0;
+                    const editBackgroundBlur =
+                        opts.editBackgroundBlur !== undefined
+                            ? opts.editBackgroundBlur
+                            : 0;
+                    const editShowLabel =
+                        opts.editShowLabel !== undefined
+                            ? opts.editShowLabel
+                            : false;
+
+                    const showDeleteButton = opts.showDeleteButton !== false;
+                    const deleteBgColor = opts.deleteBgColor || "transparent";
+                    const deleteColor = opts.deleteColor || "#f87171";
+                    const deleteSize = opts.deleteSize || 18;
+                    const deleteBorderRadius =
+                        opts.deleteBorderRadius !== undefined
+                            ? opts.deleteBorderRadius
+                            : 0;
+                    const deletePadding =
+                        opts.deletePadding !== undefined
+                            ? opts.deletePadding
+                            : 2;
+                    const deleteOpacity =
+                        opts.deleteOpacity !== undefined
+                            ? opts.deleteOpacity / 100
+                            : 1;
+                    const deleteBlur =
+                        opts.deleteBlur !== undefined ? opts.deleteBlur : 0;
+                    const deleteBackgroundBlur =
+                        opts.deleteBackgroundBlur !== undefined
+                            ? opts.deleteBackgroundBlur
+                            : 0;
+                    const deleteShowLabel =
+                        opts.deleteShowLabel !== undefined
+                            ? opts.deleteShowLabel
+                            : false;
+
+                    const showFilterBar = opts.showFilterBar !== false;
+                    const showFavouritesCount =
+                        opts.showFavouritesCount !== false;
+                    const showFavouritesText =
+                        opts.showFavouritesText !== false;
+                    const favouritesText = opts.favouritesText ?? "Favourites";
+
+                    function handleRemove(idx) {
+                        if (!confirm("Remove this favourite?")) return;
+                        const newFavs = [...favs];
+                        newFavs.splice(idx, 1);
+                        saveFavs(newFavs);
+                        setFavs(newFavs);
+                    }
+
+                    function openAddWindow() {
+                        const id = "favourites-add";
+                        function AddForm() {
+                            const [url, setUrl] = useState("");
+                            const [title, setTitle] = useState("");
+                            function handleSave() {
+                                if (!url) {
+                                    alert("URL is required");
+                                    return;
+                                }
+                                const newFavs = [...loadFavs(), { url, title }];
+                                saveFavs(newFavs);
+
+                                try {
+                                    closeWindowById(id);
+                                } catch (e) {}
+                            }
+                            return (
+                                <div className="flex flex-col gap-2 p-2">
+                                    <label className="text-sm text-zinc-300">
+                                        URL
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={url}
+                                        className="bg-transparent border border-zinc-700 rounded px-2 py-1 text-sm"
+                                        onChange={(e) => setUrl(e.target.value)}
+                                        placeholder="https://example.com"
+                                    />
+                                    <label className="text-sm text-zinc-300">
+                                        Title (optional)
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={title}
+                                        className="bg-transparent border border-zinc-700 rounded px-2 py-1 text-sm"
+                                        onChange={(e) =>
+                                            setTitle(e.target.value)
+                                        }
+                                        placeholder="My favourite"
+                                    />
+                                    <div className="flex gap-2 mt-2">
+                                        <button
+                                            className="px-3 py-1 rounded bg-green-600 text-white"
+                                            onClick={handleSave}
+                                        >
+                                            Save
+                                        </button>
+                                        <button
+                                            className="px-3 py-1 rounded bg-zinc-700 text-white"
+                                            onClick={() => closeWindowById(id)}
+                                        >
+                                            Cancel
+                                        </button>
+                                    </div>
+                                </div>
+                            );
+                        }
+
+                        createWindow(
+                            "Add Favourite",
+                            <AddForm />,
+                            <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                width="1em"
+                                height="1em"
+                                viewBox="0 0 24 24"
+                            >
+                                <path
+                                    fill="currentColor"
+                                    d="M11 11V5h2v6h6v2h-6v6h-2v-6H5v-2h6z"
+                                />
+                            </svg>,
+                            id,
+                            true,
+                        );
+                    }
+
+                    function openEditWindow(idx) {
+                        const id = `favourites-edit-${idx}`;
+                        function EditForm() {
+                            const initial = loadFavs()[idx] || {
+                                url: "",
+                                title: "",
+                            };
+                            const [url, setUrl] = useState(initial.url || "");
+                            const [title, setTitle] = useState(
+                                initial.title || "",
+                            );
+                            function handleSave() {
+                                if (!url) {
+                                    alert("URL is required");
+                                    return;
+                                }
+                                const arr = loadFavs();
+                                arr[idx] = { url, title };
+                                saveFavs(arr);
+                                try {
+                                    closeWindowById(id);
+                                } catch (e) {}
+                            }
+                            function handleDelete() {
+                                if (!confirm("Delete this favourite?")) return;
+                                const arr = loadFavs();
+                                arr.splice(idx, 1);
+                                saveFavs(arr);
+                                try {
+                                    closeWindowById(id);
+                                } catch (e) {}
+                            }
+                            return (
+                                <div className="flex flex-col gap-2 p-2">
+                                    <label className="text-sm text-zinc-300">
+                                        URL
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={url}
+                                        className="bg-transparent border border-zinc-700 rounded px-2 py-1 text-sm"
+                                        onChange={(e) => setUrl(e.target.value)}
+                                    />
+                                    <label className="text-sm text-zinc-300">
+                                        Title (optional)
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={title}
+                                        className="bg-transparent border border-zinc-700 rounded px-2 py-1 text-sm"
+                                        onChange={(e) =>
+                                            setTitle(e.target.value)
+                                        }
+                                    />
+                                    <div className="flex gap-2 mt-2">
+                                        <button
+                                            className="px-3 py-1 rounded bg-green-600 text-white"
+                                            onClick={handleSave}
+                                        >
+                                            Save
+                                        </button>
+                                        <button
+                                            className="px-3 py-1 rounded bg-red-600 text-white"
+                                            onClick={handleDelete}
+                                        >
+                                            Delete
+                                        </button>
+                                        <button
+                                            className="px-3 py-1 rounded bg-zinc-700 text-white"
+                                            onClick={() => closeWindowById(id)}
+                                        >
+                                            Cancel
+                                        </button>
+                                    </div>
+                                </div>
+                            );
+                        }
+
+                        createWindow(
+                            "Edit Favourite",
+                            <EditForm />,
+                            <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                width="1em"
+                                height="1em"
+                                viewBox="0 0 24 24"
+                            >
+                                <path
+                                    fill="currentColor"
+                                    d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 000-1.41l-2.34-2.34a1 1 0 00-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"
+                                />
+                            </svg>,
+                            id,
+                            true,
+                        );
+                    }
+
+                    const containerStyle = {
+                        width: "100%",
+                        height: "100%",
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "stretch",
+                        justifyContent: "flex-start",
+                        boxSizing: "border-box",
+                        padding: "8px",
+                        gap: "8px",
+                        backgroundColor: opts.backgroundColor
+                            ? opts.backgroundColor
+                            : undefined,
+                        background:
+                            opts.backgroundColor &&
+                            opts.backgroundOpacity !== undefined
+                                ? hexToRgba(
+                                      opts.backgroundColor,
+                                      opts.backgroundOpacity / 100,
+                                  )
+                                : opts.backgroundColor
+                                  ? opts.backgroundColor
+                                  : undefined,
+                        borderRadius: opts.borderRadius
+                            ? opts.borderRadius + "px"
+                            : "0px",
+                        ...(opts.customCss
+                            ? parseCustomCss(opts.customCss)
+                            : {}),
+                    };
+
+                    const listAreaStyle = {
+                        flex: 1,
+                        overflowY: "auto",
+                        display: opts.layout === "grid" ? "grid" : "block",
+                        gridTemplateColumns:
+                            opts.layout === "grid"
+                                ? `repeat(auto-fill, minmax(${itemSize}px, 1fr))`
+                                : undefined,
+                        gap: opts.layout === "grid" ? "12px" : undefined,
+                    };
+
+                    const headerStyle = {
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        gap: "8px",
+                        marginBottom: 4,
+                    };
+
+                    const headerLeftStyle = {
+                        display: "flex",
+                        gap: "8px",
+                        alignItems: "center",
+                    };
+
+                    const headerRightStyle = {
+                        display: "flex",
+                        gap: "8px",
+                        alignItems: "center",
+                    };
+
+                    const titleStyle = {
+                        fontSize: opts.fontSize || 16,
+                        color: opts.color || "#fff",
+                        fontWeight: 600,
+                    };
+
+                    const countStyle = {
+                        fontSize: 12,
+                        color: "#a0a0a0",
+                    };
+
+                    const filterInputStyle = {
+                        background: "#111",
+                        color: opts.color || "#fff",
+                        border: "1px solid #333",
+                        borderRadius: "6px",
+                        padding: "6px 8px",
+                        fontSize: opts.fontSize || 14,
+                    };
+
+                    const addButtonStyle = {
+                        display: "inline-flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: "6px",
+                        background: plusBg,
+                        color: plusColor,
+                        border: "none",
+                        borderRadius: plusBorderRadius + "px",
+                        padding: "6px 10px",
+                        cursor: "pointer",
+                        fontSize: plusSize * 0.5,
+                        width: plusWidth ? plusWidth + "%" : "auto",
+                        height: plusHeight ? plusHeight + "px" : "auto",
+                    };
+
+                    const addIconStyle = {
+                        display: plusHideIcon ? "none" : "inline-flex",
+                        width: plusSize,
+                        height: plusSize,
+                        alignItems: "center",
+                        justifyContent: "center",
+                        borderRadius: Math.max(2, plusBorderRadius - 2) + "px",
+                        background: "transparent",
+                        fontSize: plusSize * 0.6,
+                    };
+
+                    const addLabelStyle = {
+                        fontSize: opts.fontSize || 14,
+                    };
+
+                    const emptyStateStyle = {
+                        color: "#aaa",
+                        fontSize: "14px",
+                    };
+
+                    return (
+                        <div style={containerStyle}>
+                            <div style={headerStyle}>
+                                <div style={headerLeftStyle}>
+                                    {showFavouritesText && (
+                                        <div style={titleStyle}>
+                                            {favouritesText}
+                                        </div>
+                                    )}
+                                    {showFavouritesCount && (
+                                        <div style={countStyle}>
+                                            {favs.length} item
+                                            {favs.length !== 1 ? "s" : ""}
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div style={headerRightStyle}>
+                                    {showFilterBar && (
+                                        <input
+                                            type="text"
+                                            value={searchLocal}
+                                            onChange={(e) =>
+                                                setSearchLocal(e.target.value)
+                                            }
+                                            placeholder="Filter..."
+                                            style={filterInputStyle}
+                                        />
+                                    )}
+
+                                    {opts.showPlusButton !== false && (
+                                        <button
+                                            onClick={openAddWindow}
+                                            title="Add Favourite"
+                                            style={addButtonStyle}
+                                        >
+                                            <span style={addIconStyle}>+</span>
+                                            {plusShowLabel && (
+                                                <span style={addLabelStyle}>
+                                                    Add
+                                                </span>
+                                            )}
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+
+                            <div style={listAreaStyle}>
+                                {filteredFavs.length === 0 ? (
+                                    <div style={emptyStateStyle}>
+                                        No favourites yet.
+                                    </div>
+                                ) : opts.layout === "grid" ? (
+                                    filteredFavs.map((fav, idx) => {
+                                        let faviconUrl = "";
+                                        if (opts.faviconProvider) {
+                                            faviconUrl =
+                                                opts.faviconProvider.replace(
+                                                    "{{url}}",
+                                                    encodeURIComponent(fav.url),
+                                                );
+                                        }
+
+                                        const itemBg =
+                                            itemBgColor &&
+                                            itemBgOpacity !== undefined
+                                                ? hexToRgba(
+                                                      itemBgColor,
+                                                      itemBgOpacity,
+                                                  )
+                                                : itemBgColor
+                                                  ? itemBgColor
+                                                  : undefined;
+
+                                        const itemStyle = {
+                                            display: "flex",
+                                            flexDirection: "column",
+                                            alignItems: "center",
+                                            justifyContent: "center",
+                                            position: "relative",
+                                            textAlign: "center",
+                                            padding: itemPadding + "px",
+                                            borderRadius:
+                                                itemBorderRadius + "px",
+                                            background: itemBg || "#222",
+                                            boxShadow: itemBoxShadow,
+                                            minHeight: itemSize + "px",
+                                        };
+
+                                        const linkStyle = {
+                                            color: itemTextColor,
+                                            opacity: itemTextOpacity,
+                                            textDecoration: "none",
+                                            fontSize: opts.fontSize || 16,
+                                            display: "flex",
+                                            flexDirection: "column",
+                                            alignItems: "center",
+                                            gap: "8px",
+                                            width: "100%",
+                                        };
+
+                                        const faviconStyle = {
+                                            width: Math.min(64, itemSize * 0.4),
+                                            height: Math.min(
+                                                64,
+                                                itemSize * 0.4,
+                                            ),
+                                            marginBottom: 6,
+                                            borderRadius:
+                                                Math.max(
+                                                    4,
+                                                    itemBorderRadius - 4,
+                                                ) + "px",
+                                            background: "#222",
+                                            objectFit: "contain",
+                                        };
+
+                                        const textStyle = {
+                                            textAlign: "center",
+                                            wordBreak: "break-word",
+                                            maxWidth: "100%",
+                                            fontSize: opts.fontSize || 14,
+                                        };
+
+                                        const actionsStyle = {
+                                            position: "absolute",
+                                            top: 6,
+                                            right: 6,
+                                            display: "flex",
+                                            gap: "6px",
+                                            opacity: 0,
+                                            transition: "opacity 0.2s",
+                                        };
+
+                                        const editButtonStyle = {
+                                            background:
+                                                editBgColor &&
+                                                editBgOpacity !== undefined
+                                                    ? hexToRgba(
+                                                          editBgColor,
+                                                          editBgOpacity,
+                                                      )
+                                                    : editBgColor,
+                                            color: editColor,
+                                            border: "none",
+                                            borderRadius:
+                                                editBorderRadius + "px",
+                                            padding:
+                                                editPadding +
+                                                "px " +
+                                                (editPadding + 2) +
+                                                "px",
+                                            cursor: "pointer",
+                                            fontSize: editSize + "px",
+                                            opacity: editOpacity,
+                                            filter: editBlur
+                                                ? `blur(${editBlur}px)`
+                                                : undefined,
+                                            backdropFilter: editBackgroundBlur
+                                                ? `blur(${editBackgroundBlur}px)`
+                                                : undefined,
+                                        };
+
+                                        const deleteButtonStyle = {
+                                            background: deleteBgColor,
+                                            color: deleteColor,
+                                            border: "none",
+                                            borderRadius:
+                                                deleteBorderRadius + "px",
+                                            padding:
+                                                deletePadding +
+                                                "px " +
+                                                (deletePadding + 4) +
+                                                "px",
+                                            cursor: "pointer",
+                                            fontSize: deleteSize + "px",
+                                            opacity: deleteOpacity,
+                                            filter: deleteBlur
+                                                ? `blur(${deleteBlur}px)`
+                                                : undefined,
+                                            backdropFilter: deleteBackgroundBlur
+                                                ? `blur(${deleteBackgroundBlur}px)`
+                                                : undefined,
+                                        };
+
+                                        return (
+                                            <div
+                                                key={fav.url + idx}
+                                                style={itemStyle}
+                                                onMouseEnter={(e) => {
+                                                    const actions =
+                                                        e.currentTarget.querySelector(
+                                                            ".hover-actions",
+                                                        );
+                                                    if (actions)
+                                                        actions.style.opacity =
+                                                            "1";
+                                                }}
+                                                onMouseLeave={(e) => {
+                                                    const actions =
+                                                        e.currentTarget.querySelector(
+                                                            ".hover-actions",
+                                                        );
+                                                    if (actions)
+                                                        actions.style.opacity =
+                                                            "0";
+                                                }}
+                                            >
+                                                <a
+                                                    href={fav.url}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    style={linkStyle}
+                                                >
+                                                    {faviconUrl && (
+                                                        <img
+                                                            src={
+                                                                "/proxy?url=" +
+                                                                btoa(faviconUrl)
+                                                            }
+                                                            alt="favicon"
+                                                            style={faviconStyle}
+                                                        />
+                                                    )}
+                                                    <span style={textStyle}>
+                                                        {fav.title || fav.url}
+                                                    </span>
+                                                </a>
+
+                                                <div
+                                                    className="hover-actions"
+                                                    style={actionsStyle}
+                                                >
+                                                    {showEditButton && (
+                                                        <button
+                                                            title="Edit"
+                                                            onClick={() =>
+                                                                openEditWindow(
+                                                                    idx,
+                                                                )
+                                                            }
+                                                            style={
+                                                                editButtonStyle
+                                                            }
+                                                        >
+                                                            {editShowLabel
+                                                                ? "Edit"
+                                                                : "✎"}
+                                                        </button>
+                                                    )}
+
+                                                    {showDeleteButton && (
+                                                        <button
+                                                            title="Remove"
+                                                            onClick={() =>
+                                                                handleRemove(
+                                                                    idx,
+                                                                )
+                                                            }
+                                                            style={
+                                                                deleteButtonStyle
+                                                            }
+                                                        >
+                                                            {deleteShowLabel
+                                                                ? "Delete"
+                                                                : "×"}
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        );
+                                    })
+                                ) : (
+                                    filteredFavs.map((fav, idx) => {
+                                        let faviconUrl = "";
+                                        if (opts.faviconProvider) {
+                                            faviconUrl =
+                                                opts.faviconProvider.replace(
+                                                    "{{url}}",
+                                                    encodeURIComponent(fav.url),
+                                                );
+                                        }
+
+                                        const rowStyle = {
+                                            display: "flex",
+                                            alignItems: "center",
+                                            justifyContent: "space-between",
+                                            padding: "8px",
+                                            borderRadius:
+                                                itemBorderRadius + "px",
+                                            background:
+                                                idx % 2 === 0
+                                                    ? "transparent"
+                                                    : "rgba(255,255,255,0.02)",
+                                        };
+
+                                        const linkStyle = {
+                                            color: opts.color || "#fff",
+                                            textDecoration: "none",
+                                            fontSize: opts.fontSize || 16,
+                                            flex: 1,
+                                            display: "flex",
+                                            alignItems: "center",
+                                            gap: "12px",
+                                        };
+
+                                        const faviconStyle = {
+                                            width: 20,
+                                            height: 20,
+                                            marginRight: 4,
+                                            borderRadius: "4px",
+                                            background: "#222",
+                                            objectFit: "contain",
+                                        };
+
+                                        const textContainerStyle = {
+                                            display: "flex",
+                                            flexDirection: "column",
+                                        };
+
+                                        const urlStyle = {
+                                            fontSize: 12,
+                                            color: "#9aa0a6",
+                                        };
+
+                                        const actionsStyle = {
+                                            display: "flex",
+                                            gap: "8px",
+                                            marginLeft: "8px",
+                                            opacity: 0,
+                                            transition: "opacity 0.2s",
+                                        };
+
+                                        const editButtonStyle = {
+                                            background: editBgColor,
+                                            color: editColor,
+                                            border: "none",
+                                            borderRadius:
+                                                editBorderRadius + "px",
+                                            padding:
+                                                editPadding +
+                                                "px " +
+                                                editPadding * 2 +
+                                                "px",
+                                            cursor: "pointer",
+                                            fontSize: editSize + "px",
+                                            opacity: editOpacity,
+                                            filter: editBlur
+                                                ? `blur(${editBlur}px)`
+                                                : undefined,
+                                            backdropFilter: editBackgroundBlur
+                                                ? `blur(${editBackgroundBlur}px)`
+                                                : undefined,
+                                        };
+
+                                        const deleteButtonStyle = {
+                                            background: deleteBgColor,
+                                            color: deleteColor,
+                                            border: "none",
+                                            borderRadius:
+                                                deleteBorderRadius + "px",
+                                            padding:
+                                                deletePadding +
+                                                "px " +
+                                                deletePadding * 2 +
+                                                "px",
+                                            cursor: "pointer",
+                                            fontSize: deleteSize + "px",
+                                            opacity: deleteOpacity,
+                                            filter: deleteBlur
+                                                ? `blur(${deleteBlur}px)`
+                                                : undefined,
+                                            backdropFilter: deleteBackgroundBlur
+                                                ? `blur(${deleteBackgroundBlur}px)`
+                                                : undefined,
+                                        };
+
+                                        return (
+                                            <div
+                                                key={fav.url + idx}
+                                                style={rowStyle}
+                                                onMouseEnter={(e) => {
+                                                    const actions =
+                                                        e.currentTarget.querySelector(
+                                                            ".hover-actions",
+                                                        );
+                                                    if (actions)
+                                                        actions.style.opacity =
+                                                            "1";
+                                                }}
+                                                onMouseLeave={(e) => {
+                                                    const actions =
+                                                        e.currentTarget.querySelector(
+                                                            ".hover-actions",
+                                                        );
+                                                    if (actions)
+                                                        actions.style.opacity =
+                                                            "0";
+                                                }}
+                                            >
+                                                <a
+                                                    href={fav.url}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    style={linkStyle}
+                                                >
+                                                    {faviconUrl && (
+                                                        <img
+                                                            src={
+                                                                "/proxy?url=" +
+                                                                btoa(faviconUrl)
+                                                            }
+                                                            alt="favicon"
+                                                            style={faviconStyle}
+                                                        />
+                                                    )}
+                                                    <div
+                                                        style={
+                                                            textContainerStyle
+                                                        }
+                                                    >
+                                                        <span>
+                                                            {fav.title ||
+                                                                fav.url}
+                                                        </span>
+                                                        <span style={urlStyle}>
+                                                            {fav.url}
+                                                        </span>
+                                                    </div>
+                                                </a>
+                                                <div
+                                                    className="hover-actions"
+                                                    style={actionsStyle}
+                                                >
+                                                    {showEditButton && (
+                                                        <button
+                                                            title="Edit"
+                                                            onClick={() =>
+                                                                openEditWindow(
+                                                                    idx,
+                                                                )
+                                                            }
+                                                            style={
+                                                                editButtonStyle
+                                                            }
+                                                        >
+                                                            {editShowLabel
+                                                                ? "Edit"
+                                                                : "✎"}
+                                                        </button>
+                                                    )}
+                                                    {showDeleteButton && (
+                                                        <button
+                                                            title="Remove"
+                                                            onClick={() =>
+                                                                handleRemove(
+                                                                    idx,
+                                                                )
+                                                            }
+                                                            style={
+                                                                deleteButtonStyle
+                                                            }
+                                                        >
+                                                            {deleteShowLabel
+                                                                ? "Delete"
+                                                                : "×"}
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        );
+                                    })
+                                )}
+                            </div>
+                        </div>
+                    );
+                },
+                [
+                    [500, 500],
+                    [50, 50],
+                ],
+                [350, 250],
+                {
+                    fontSize: {
+                        type: "number",
+                        typeRefine: "slider",
+                        label: "Font Size",
+                        default: 16,
+                        min: 8,
+                        max: 32,
+                    },
+                    color: {
+                        type: "color",
+                        label: "Text Color",
+                        default: "#ffffff",
+                    },
+                    backgroundColor: {
+                        type: "color",
+                        label: "Background Color",
+                        default: "",
+                    },
+                    backgroundOpacity: {
+                        type: "number",
+                        typeRefine: "slider",
+                        label: "Background Opacity",
+                        default: 100,
+                        min: 0,
+                        max: 100,
+                    },
+                    borderRadius: {
+                        type: "number",
+                        typeRefine: "slider",
+                        label: "Border Radius (px)",
+                        default: 8,
+                        min: 0,
+                        max: 50,
+                    },
+                    customCss: {
+                        type: "string",
+                        label: "Custom CSS (inline)",
+                        default: "",
+                        typeRefine: "multiline",
+                    },
+                    search: {
+                        type: "string",
+                        label: "Search Filter",
+                        default: "",
+                    },
+                    faviconProvider: {
+                        type: "string",
+                        label: "Favicon Provider URL",
+                        default:
+                            "https://www.google.com/s2/favicons?sz=64&domain_url={{url}}",
+                    },
+                    layout: {
+                        type: "option",
+                        label: "Layout",
+                        default: "grid",
+                        options: [
+                            { value: "list", label: "List" },
+                            { value: "grid", label: "Grid" },
+                        ],
+                    },
+                    showPlusButton: {
+                        type: "boolean",
+                        label: "Show Add Favourite Button",
+                        default: true,
+                    },
+                    showFilterBar: {
+                        type: "boolean",
+                        label: "Show Filter Bar",
+                        default: true,
+                    },
+                    showFavouritesCount: {
+                        type: "boolean",
+                        label: "Show Favourites Count",
+                        default: false,
+                    },
+                    showFavouritesText: {
+                        type: "boolean",
+                        label: "Show Favourites Text",
+                        default: true,
+                    },
+                    favouritesText: {
+                        type: "string",
+                        label: "Favourites Text",
+                        default: "Favourites",
+                    },
+                    itemBgColor: {
+                        type: "color",
+                        label: "Item Background Color",
+                        default: "#222222",
+                    },
+                    itemBgOpacity: {
+                        type: "number",
+                        typeRefine: "slider",
+                        label: "Item Background Opacity",
+                        default: 100,
+                        min: 0,
+                        max: 100,
+                    },
+                    itemTextOpacity: {
+                        type: "number",
+                        typeRefine: "slider",
+                        label: "Item Text Opacity",
+                        default: 100,
+                        min: 0,
+                        max: 100,
+                    },
+                    itemBorderRadius: {
+                        type: "number",
+                        typeRefine: "slider",
+                        label: "Item Border Radius (px)",
+                        default: 8,
+                        min: 0,
+                        max: 50,
+                    },
+                    itemPadding: {
+                        type: "number",
+                        typeRefine: "slider",
+                        label: "Item Padding (px)",
+                        default: 8,
+                        min: 0,
+                        max: 40,
+                    },
+                    itemSize: {
+                        type: "number",
+                        typeRefine: "slider",
+                        label: "Item Minimum Size (px, grid)",
+                        default: 120,
+                        min: 60,
+                        max: 300,
+                    },
+                    plusBgColor: {
+                        type: "color",
+                        label: "Add Button Background",
+                        default: "#2563eb",
+                    },
+                    plusColor: {
+                        type: "color",
+                        label: "Add Button Text Color",
+                        default: "#ffffff",
+                    },
+                    plusSize: {
+                        type: "number",
+                        typeRefine: "slider",
+                        label: "Add Button Size (px)",
+                        default: 28,
+                        min: 16,
+                        max: 48,
+                    },
+                    plusBorderRadius: {
+                        type: "number",
+                        typeRefine: "slider",
+                        label: "Add Button Border Radius (px)",
+                        default: 6,
+                        min: 0,
+                        max: 40,
+                    },
+                    plusShowLabel: {
+                        type: "boolean",
+                        label: "Show Add Button Label",
+                        default: false,
+                    },
+                    plusHideIcon: {
+                        type: "boolean",
+                        label: "Hide Add Button Icon",
+                        default: false,
+                    },
+                    plusWidth: {
+                        type: "number",
+                        typeRefine: "slider",
+                        label: "Add Button Width (%)",
+                        default: null,
+                        min: 10,
+                        max: 100,
+                    },
+                    plusHeight: {
+                        type: "number",
+                        typeRefine: "slider",
+                        label: "Add Button Height (px)",
+                        default: null,
+                        min: 20,
+                        max: 100,
+                    },
+                    showEditButton: {
+                        type: "boolean",
+                        label: "Show Edit Button",
+                        default: true,
+                    },
+                    editBgColor: {
+                        type: "color",
+                        label: "Edit Button Background",
+                        default: "rgba(255,255,255,0.06)",
+                    },
+                    editBgOpacity: {
+                        type: "number",
+                        typeRefine: "slider",
+                        label: "Edit Button Background Opacity",
+                        default: 100,
+                        min: 0,
+                        max: 100,
+                    },
+                    editColor: {
+                        type: "color",
+                        label: "Edit Button Color",
+                        default: "#ffffff",
+                    },
+                    editSize: {
+                        type: "number",
+                        typeRefine: "slider",
+                        label: "Edit Button Size (px)",
+                        default: 13,
+                        min: 8,
+                        max: 24,
+                    },
+                    editBorderRadius: {
+                        type: "number",
+                        typeRefine: "slider",
+                        label: "Edit Button Border Radius (px)",
+                        default: 6,
+                        min: 0,
+                        max: 20,
+                    },
+                    editPadding: {
+                        type: "number",
+                        typeRefine: "slider",
+                        label: "Edit Button Padding (px)",
+                        default: 4,
+                        min: 0,
+                        max: 20,
+                    },
+                    editOpacity: {
+                        type: "number",
+                        typeRefine: "slider",
+                        label: "Edit Button Opacity",
+                        default: 100,
+                        min: 0,
+                        max: 100,
+                    },
+                    editBlur: {
+                        type: "number",
+                        typeRefine: "slider",
+                        label: "Edit Button Blur (px)",
+                        default: 0,
+                        min: 0,
+                        max: 20,
+                    },
+                    editBackgroundBlur: {
+                        type: "number",
+                        typeRefine: "slider",
+                        label: "Edit Button Background Blur (px)",
+                        default: 0,
+                        min: 0,
+                        max: 40,
+                    },
+                    editShowLabel: {
+                        type: "boolean",
+                        label: "Show Edit Button Label",
+                        default: false,
+                    },
+                    showDeleteButton: {
+                        type: "boolean",
+                        label: "Show Delete Button",
+                        default: true,
+                    },
+                    deleteBgColor: {
+                        type: "color",
+                        label: "Delete Button Background",
+                        default: "transparent",
+                    },
+                    deleteColor: {
+                        type: "color",
+                        label: "Delete Button Color",
+                        default: "#f87171",
+                    },
+                    deleteSize: {
+                        type: "number",
+                        typeRefine: "slider",
+                        label: "Delete Button Size (px)",
+                        default: 18,
+                        min: 8,
+                        max: 32,
+                    },
+                    deleteBorderRadius: {
+                        type: "number",
+                        typeRefine: "slider",
+                        label: "Delete Button Border Radius (px)",
+                        default: 0,
+                        min: 0,
+                        max: 20,
+                    },
+                    deletePadding: {
+                        type: "number",
+                        typeRefine: "slider",
+                        label: "Delete Button Padding (px)",
+                        default: 2,
+                        min: 0,
+                        max: 20,
+                    },
+                    deleteOpacity: {
+                        type: "number",
+                        typeRefine: "slider",
+                        label: "Delete Button Opacity",
+                        default: 100,
+                        min: 0,
+                        max: 100,
+                    },
+                    deleteBlur: {
+                        type: "number",
+                        typeRefine: "slider",
+                        label: "Delete Button Blur (px)",
+                        default: 0,
+                        min: 0,
+                        max: 20,
+                    },
+                    deleteBackgroundBlur: {
+                        type: "number",
+                        typeRefine: "slider",
+                        label: "Delete Button Background Blur (px)",
+                        default: 0,
+                        min: 0,
+                        max: 40,
+                    },
+                    deleteShowLabel: {
+                        type: "boolean",
+                        label: "Show Delete Button Label",
+                        default: false,
+                    },
+                },
+            );
+
+            registerWidget(
+                "searchbar",
+                "Search Bar",
+                ({ opts }) => {
+                    const style = {
+                        width: "100%",
+                        height: "100%",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        backgroundColor: opts.backgroundColor
+                            ? opts.backgroundColor
+                            : undefined,
+                        background:
+                            opts.backgroundColor &&
+                            opts.backgroundOpacity !== undefined
+                                ? hexToRgba(
+                                      opts.backgroundColor,
+                                      opts.backgroundOpacity / 100,
+                                  )
+                                : opts.backgroundColor
+                                  ? opts.backgroundColor
+                                  : undefined,
+                        borderRadius:
+                            typeof opts.borderRadius === "number"
+                                ? opts.borderRadius + "px"
+                                : "0px",
+                        boxSizing: "border-box",
+                        padding: "8px",
+                        ...(opts.customCss
+                            ? parseCustomCss(opts.customCss)
+                            : {}),
+                    };
+
+                    const [query, setQuery] = React.useState("");
+                    const [engine, setEngine] = React.useState(
+                        opts.engine || "google",
+                    );
+                    const [suggestions, setSuggestions] = React.useState([]);
+                    const [showSug, setShowSug] = React.useState(false);
+                    const [activeIdx, setActiveIdx] = React.useState(-1);
+                    const [isHoveringSug, setIsHoveringSug] =
+                        React.useState(false);
+                    const inputRef = React.useRef(null);
+                    const canvasRef = React.useRef(null);
+                    const [caretLeft, setCaretLeft] = React.useState(0);
+
+                    const defaultEngines = [
+                        {
+                            value: "google",
+                            label: "Google",
+                            url: "https://www.google.com/search?q=",
+                        },
+                        {
+                            value: "duckduckgo",
+                            label: "DuckDuckGo",
+                            url: "https://duckduckgo.com/?q=",
+                        },
+                        {
+                            value: "bing",
+                            label: "Bing",
+                            url: "https://www.bing.com/search?q=",
+                        },
+                        {
+                            value: "brave",
+                            label: "Brave",
+                            url: "https://search.brave.com/search?q=",
+                        },
+                        {
+                            value: "yahoo",
+                            label: "Yahoo",
+                            url: "https://search.yahoo.com/search?p=",
+                        },
+                    ];
+                    let engines = defaultEngines;
+                    try {
+                        const stored = localStorage.getItem(
+                            "prefs_searchengines",
+                        );
+                        if (stored) {
+                            const parsed = JSON.parse(stored);
+                            if (
+                                Array.isArray(parsed) &&
+                                parsed.length > 0 &&
+                                parsed.every((e) => e && e.value && e.url)
+                            ) {
+                                engines = parsed;
+                            }
+                        }
+                    } catch (e) {}
+
+                    function selectedEngine() {
+                        return (
+                            engines.find((eng) => eng.value === engine) ||
+                            engines[0]
+                        );
+                    }
+
+                    const suggestionProvider =
+                        opts.suggestionProvider ||
+                        "https://suggestqueries.google.com/complete/search?client=firefox&q={{query}}";
+
+                    const debounceRef = React.useRef(null);
+                    React.useEffect(() => {
+                        if (!opts.showSuggestions) {
+                            setSuggestions([]);
+                            setShowSug(false);
+                            return;
+                        }
+                        if (!query) {
+                            setSuggestions([]);
+                            setShowSug(false);
+                            return;
+                        }
+
+                        if (debounceRef.current)
+                            clearTimeout(debounceRef.current);
+                        debounceRef.current = setTimeout(async () => {
+                            try {
+                                const url = suggestionProvider.replace(
+                                    "{{query}}",
+                                    encodeURIComponent(query),
+                                );
+                                const proxied =
+                                    "/proxy?url=" +
+                                    btoa(encodeURIComponent(url));
+                                const res = await fetch(proxied);
+                                const txt = await res.text();
+
+                                let suggs = [];
+                                try {
+                                    const data = JSON.parse(txt);
+                                    if (
+                                        Array.isArray(data) &&
+                                        Array.isArray(data[1])
+                                    ) {
+                                        suggs = data[1].filter(Boolean);
+                                    } else if (Array.isArray(data)) {
+                                        suggs = data.filter(
+                                            (v) => typeof v === "string",
+                                        );
+                                    }
+                                } catch {
+                                    suggs = [];
+                                }
+
+                                // Bangs to be implemented
+
+                                setSuggestions(suggs.slice(0, 8));
+                                setShowSug(true);
+                                setActiveIdx(suggs.length > 0 ? 0 : -1);
+                            } catch (e) {
+                                setSuggestions([]);
+                                setShowSug(false);
+                            }
+                        }, 150);
+
+                        return () => {
+                            if (debounceRef.current)
+                                clearTimeout(debounceRef.current);
+                        };
+                    }, [query, suggestionProvider, opts.showSuggestions]);
+
+                    function ensureCanvas() {
+                        if (!canvasRef.current) {
+                            const c = document.createElement("canvas");
+                            canvasRef.current = c.getContext("2d");
+                        }
+                        return canvasRef.current;
+                    }
+
+                    function updateCaretLeft() {
+                        if (!inputRef.current) return;
+                        const el = inputRef.current;
+                        const value = el.value.slice(0, el.selectionStart || 0);
+                        const ctx = ensureCanvas();
+                        const ff = opts.searchBoxFont || "inherit";
+                        const fs = (opts.fontSize || 16) + "px";
+                        ctx.font = `${fs} ${ff}`;
+                        const metrics = ctx.measureText(value);
+                        const paddingLeft = parseInt(
+                            window.getComputedStyle(el).paddingLeft || "10",
+                            10,
+                        );
+                        const caretX =
+                            Math.floor(metrics.width) +
+                            paddingLeft -
+                            (el.scrollLeft || 0);
+                        setCaretLeft(Math.max(0, caretX));
+                    }
+                    React.useEffect(() => {
+                        updateCaretLeft();
+                    }, [query, opts.searchBoxFont, opts.fontSize]);
+
+                    function handleSubmit(e) {
+                        e.preventDefault();
+                        if (opts.enterToSearch === false) return;
+                        const sel = selectedEngine();
+                        const url = sel.url + encodeURIComponent(query);
+                        window.open(url, "_blank");
+                        setShowSug(false);
+                    }
+
+                    function applySuggestion(idx, submitAfter = false) {
+                        if (idx < 0 || idx >= suggestions.length) return;
+                        const text = suggestions[idx];
+                        setQuery(text);
+                        setShowSug(false);
+                        setActiveIdx(-1);
+
+                        requestAnimationFrame(() => {
+                            if (inputRef.current) {
+                                inputRef.current.focus();
+                                inputRef.current.setSelectionRange(
+                                    text.length,
+                                    text.length,
+                                );
+                            }
+                        });
+                        if (submitAfter && opts.enterToSearch !== false) {
+                            const sel = selectedEngine();
+                            const url = sel.url + encodeURIComponent(text);
+                            window.open(url, "_blank");
+                        }
+                    }
+
+                    function onKeyDown(e) {
+                        if (!opts.showSuggestions) return;
+                        if (!showSug || suggestions.length === 0) {
+                            if (
+                                e.key === "Enter" &&
+                                opts.enterToSearch === false
+                            ) {
+                                e.preventDefault();
+                            }
+                            return;
+                        }
+
+                        if (e.key === "ArrowDown") {
+                            e.preventDefault();
+                            setActiveIdx((i) => {
+                                const ni =
+                                    i < suggestions.length - 1 ? i + 1 : 0;
+                                return ni;
+                            });
+                        } else if (e.key === "ArrowUp") {
+                            e.preventDefault();
+                            setActiveIdx((i) => {
+                                const ni =
+                                    i > 0 ? i - 1 : suggestions.length - 1;
+                                return ni;
+                            });
+                        } else if (e.key === "Enter") {
+                            if (activeIdx >= 0) {
+                                e.preventDefault();
+                                applySuggestion(activeIdx, true);
+                            }
+                        } else if (e.key === "Tab" && opts.useTabComplete) {
+                            if (activeIdx >= 0) {
+                                e.preventDefault();
+                                applySuggestion(activeIdx, false);
+                            }
+                        }
+                    }
+
+                    function onInputChange(e) {
+                        setQuery(e.target.value);
+                        setShowSug(true);
+                        setActiveIdx(-1);
+                        updateCaretLeft();
+                    }
+
+                    function onInputFocus() {
+                        if (opts.showSuggestions && suggestions.length > 0) {
+                            setShowSug(true);
+                        }
+                    }
+
+                    function onInputBlur() {
+                        setTimeout(() => {
+                            if (!isHoveringSug) setShowSug(false);
+                        }, 120);
+                    }
+
+                    const searchBarBg = opts.searchBarBgColor
+                        ? opts.searchBarBgOpacity !== undefined
+                            ? hexToRgba(
+                                  opts.searchBarBgColor,
+                                  opts.searchBarBgOpacity / 100,
+                              )
+                            : opts.searchBarBgColor
+                        : "#111";
+                    const inputTextColor = opts.color || "#fff";
+                    const inputHoverBorderColor = opts.hoverColor || "#444";
+                    const searchBarRadius =
+                        typeof opts.searchBarRoundness === "number"
+                            ? opts.searchBarRoundness
+                            : 12;
+
+                    const showEngineSelector =
+                        opts.showEngineSelector !== false;
+                    const showSearchButton = opts.showSearchButton !== false;
+                    const showSearchIconInside = !!opts.showSearchIconInside;
+
+                    const iconColor = opts.searchIconColor || "#9aa0a6";
+                    const iconHoverColor =
+                        opts.searchIconHoverColor || "#ffffff";
+                    const iconOpacity =
+                        typeof opts.iconOpacity === "number"
+                            ? opts.iconOpacity / 100
+                            : 1;
+                    const iconBgOpacity =
+                        typeof opts.iconBgOpacity === "number"
+                            ? opts.iconBgOpacity / 100
+                            : 0;
+                    const iconContainerStyle = {
+                        position: "absolute",
+                        left: 8,
+                        top: "50%",
+                        transform: "translateY(-50%)",
+                        display: showSearchIconInside ? "flex" : "none",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        width: 28,
+                        height: 28,
+                        borderRadius: 6,
+                        background:
+                            iconBgOpacity > 0
+                                ? `rgba(255,255,255,${iconBgOpacity * 0.08})`
+                                : "transparent",
+                        color: iconColor,
+                        opacity: iconOpacity,
+                        cursor: "pointer",
+                        transition: "color 0.15s ease, opacity 0.15s ease",
+                    };
+
+                    const inputWrapperStyle = {
+                        position: "relative",
+                        flex: 1,
+                        display: "flex",
+                        alignItems: "center",
+                    };
+
+                    const inputStyle = {
+                        width: "100%",
+                        background: searchBarBg,
+                        color: inputTextColor,
+                        border: "1px solid #333",
+                        borderRadius: `${searchBarRadius}px`,
+                        padding: "8px 12px",
+                        paddingLeft: showSearchIconInside ? "40px" : "12px",
+                        fontSize: opts.fontSize || 16,
+                        fontFamily: opts.searchBoxFont || "inherit",
+                        outline: "none",
+                    };
+
+                    const searchBtnRadius =
+                        typeof opts.searchButtonRoundness === "number"
+                            ? opts.searchButtonRoundness
+                            : 8;
+
+                    const searchBtnStyle = {
+                        background: opts.searchButtonBgColor || "#2563eb",
+                        color: opts.searchButtonColor || "#fff",
+                        border: "none",
+                        borderRadius: `${searchBtnRadius}px`,
+                        padding: "8px 16px",
+                        fontSize: opts.fontSize || 16,
+                        cursor: "pointer",
+                        fontFamily: opts.searchButtonFont || "inherit",
+                        opacity:
+                            typeof opts.searchButtonOpacity === "number"
+                                ? Math.max(
+                                      0,
+                                      Math.min(
+                                          1,
+                                          opts.searchButtonOpacity / 100,
+                                      ),
+                                  )
+                                : 1,
+                        display: showSearchButton ? "inline-flex" : "none",
+                        alignItems: "center",
+                        gap: "6px",
+                    };
+
+                    const sugBg = opts.suggestionBgColor || "#000000";
+                    const sugBgOpacity =
+                        typeof opts.suggestionBgOpacity === "number"
+                            ? opts.suggestionBgOpacity / 100
+                            : 0.9;
+                    const sugRadius =
+                        typeof opts.suggestionRoundness === "number"
+                            ? opts.suggestionRoundness
+                            : Math.max(6, searchBarRadius);
+                    const selectedSugColor =
+                        opts.selectedSuggestionColor || "#ffffff";
+                    const alreadyTypedColor =
+                        opts.alreadyTypedColor || "#9aa0a6";
+                    const suggestionsFont =
+                        opts.suggestionsFont || opts.font || "inherit";
+                    const suggestionShowOnlyRemainder =
+                        !!opts.suggestionShowOnlyRemainder;
+
+                    const suggestionsContainerStyle = {
+                        position: "absolute",
+                        zIndex: 10,
+                        top: "calc(100% + 6px)",
+                        left: suggestionShowOnlyRemainder
+                            ? `${caretLeft}px`
+                            : "0px",
+                        minWidth: suggestionShowOnlyRemainder ? "auto" : "100%",
+                        maxWidth: "100%",
+                        background: hexToRgba(sugBg, sugBgOpacity),
+                        border: "1px solid rgba(255,255,255,0.08)",
+                        borderRadius: `${sugRadius}px`,
+                        backdropFilter: "blur(6px)",
+                        padding: "4px",
+                        boxShadow: "0 6px 18px rgba(0,0,0,0.3)",
+                        color: opts.suggestionTextColor || "#fff",
+                        fontFamily: suggestionsFont,
+                    };
+
+                    const suggestionItemStyle = (idx) => ({
+                        padding: "6px 10px",
+                        borderRadius: `${Math.max(4, sugRadius - 4)}px`,
+                        cursor: "pointer",
+                        background:
+                            activeIdx === idx
+                                ? "rgba(255,255,255,0.08)"
+                                : "transparent",
+                        color:
+                            activeIdx === idx
+                                ? selectedSugColor
+                                : opts.suggestionTextColor || "#fff",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "8px",
+                        fontSize: opts.fontSize || 16,
+                    });
+
+                    const placeholderText = opts.placeholder || "Search...";
+                    const showButtonIcon = opts.showSearchButtonIcon !== false;
+                    const searchButtonText = opts.searchButtonText || "Search";
+
+                    return (
+                        <div style={style}>
+                            <form
+                                onSubmit={handleSubmit}
+                                style={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    width: "100%",
+                                    gap: "8px",
+                                }}
+                            >
+                                {showEngineSelector && (
+                                    <select
+                                        value={engine}
+                                        onChange={(e) =>
+                                            setEngine(e.target.value)
+                                        }
+                                        style={{
+                                            background: "#222",
+                                            color: "#fff",
+                                            border: "none",
+                                            borderRadius: "4px",
+                                            padding: "6px 8px",
+                                            fontSize: opts.fontSize || 16,
+                                        }}
+                                    >
+                                        {engines.map((eng) => (
+                                            <option
+                                                key={eng.value}
+                                                value={eng.value}
+                                            >
+                                                {eng.label}
+                                            </option>
+                                        ))}
+                                    </select>
+                                )}
+
+                                <div style={inputWrapperStyle}>
+                                    {showSearchIconInside && (
+                                        <div
+                                            title="Search"
+                                            style={iconContainerStyle}
+                                            onMouseEnter={(e) => {
+                                                e.currentTarget.style.color =
+                                                    iconHoverColor;
+                                                e.currentTarget.style.opacity =
+                                                    "1";
+                                            }}
+                                            onMouseLeave={(e) => {
+                                                e.currentTarget.style.color =
+                                                    iconColor;
+                                                e.currentTarget.style.opacity =
+                                                    String(iconOpacity);
+                                            }}
+                                            onClick={() => {
+                                                if (
+                                                    opts.enterToSearch === false
+                                                )
+                                                    return;
+                                                const sel = selectedEngine();
+                                                const url =
+                                                    sel.url +
+                                                    encodeURIComponent(query);
+                                                location.href = url;
+                                            }}
+                                        >
+                                            <svg
+                                                xmlns="http://www.w3.org/2000/svg"
+                                                width="1em"
+                                                height="1em"
+                                                viewBox="0 0 24 24"
+                                            >
+                                                <g
+                                                    fill="none"
+                                                    stroke="currentColor"
+                                                    stroke-linecap="round"
+                                                    stroke-linejoin="round"
+                                                    stroke-width="2"
+                                                >
+                                                    <path d="m21 21l-4.34-4.34" />
+                                                    <circle
+                                                        cx="11"
+                                                        cy="11"
+                                                        r="8"
+                                                    />
+                                                </g>
+                                            </svg>
+                                        </div>
+                                    )}
+                                    <input
+                                        ref={inputRef}
+                                        type="text"
+                                        value={query}
+                                        onChange={onInputChange}
+                                        onFocus={onInputFocus}
+                                        onBlur={onInputBlur}
+                                        onKeyDown={onKeyDown}
+                                        placeholder={placeholderText}
+                                        style={inputStyle}
+                                        onMouseUp={updateCaretLeft}
+                                        onKeyUp={updateCaretLeft}
+                                        onClick={updateCaretLeft}
+                                        onScroll={updateCaretLeft}
+                                        onMouseMove={updateCaretLeft}
+                                    />
+                                    {/* Suggestions */}
+                                    {opts.showSuggestions &&
+                                        showSug &&
+                                        suggestions.length > 0 && (
+                                            <div
+                                                style={
+                                                    suggestionsContainerStyle
+                                                }
+                                                onMouseEnter={() =>
+                                                    setIsHoveringSug(true)
+                                                }
+                                                onMouseLeave={() =>
+                                                    setIsHoveringSug(false)
+                                                }
+                                            >
+                                                {suggestions.map((s, idx) => {
+                                                    const starts = s
+                                                        .toLowerCase()
+                                                        .startsWith(
+                                                            query.toLowerCase(),
+                                                        );
+                                                    const remainder = starts
+                                                        ? s.slice(query.length)
+                                                        : s;
+                                                    const alreadyTyped = starts
+                                                        ? query
+                                                        : "";
+                                                    return (
+                                                        <div
+                                                            key={s + ":" + idx}
+                                                            style={suggestionItemStyle(
+                                                                idx,
+                                                            )}
+                                                            onMouseEnter={() =>
+                                                                setActiveIdx(
+                                                                    idx,
+                                                                )
+                                                            }
+                                                            onMouseDown={(
+                                                                e,
+                                                            ) => {
+                                                                e.preventDefault();
+                                                                applySuggestion(
+                                                                    idx,
+                                                                    opts.enterToSearch !==
+                                                                        false,
+                                                                );
+                                                            }}
+                                                        >
+                                                            {suggestionShowOnlyRemainder &&
+                                                            starts &&
+                                                            remainder.length >
+                                                                0 ? (
+                                                                <div
+                                                                    style={{
+                                                                        display:
+                                                                            "inline",
+                                                                    }}
+                                                                >
+                                                                    <span>
+                                                                        {
+                                                                            remainder
+                                                                        }
+                                                                    </span>
+                                                                </div>
+                                                            ) : (
+                                                                <div className="flex gap-0">
+                                                                    <span
+                                                                        style={{
+                                                                            color: alreadyTypedColor,
+                                                                        }}
+                                                                    >
+                                                                        {
+                                                                            alreadyTyped
+                                                                        }
+                                                                    </span>
+                                                                    {alreadyTyped
+                                                                        .split(
+                                                                            "",
+                                                                        )
+                                                                        .at(
+                                                                            -1,
+                                                                        ) ===
+                                                                        " " && (
+                                                                        <span>
+                                                                            &nbsp;
+                                                                        </span>
+                                                                    )}
+                                                                    {remainder.split(
+                                                                        "",
+                                                                    )[0] ===
+                                                                        " " && (
+                                                                        <span>
+                                                                            &nbsp;
+                                                                        </span>
+                                                                    )}
+                                                                    <span>
+                                                                        {
+                                                                            remainder
+                                                                        }
+                                                                    </span>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        )}
+                                </div>
+
+                                {showSearchButton && (
+                                    <button
+                                        type="submit"
+                                        style={searchBtnStyle}
+                                        onMouseEnter={(e) => {
+                                            e.currentTarget.style.background =
+                                                opts.searchButtonHoverBgColor ||
+                                                e.currentTarget.style
+                                                    .background;
+                                            e.currentTarget.style.color =
+                                                opts.searchButtonHoverColor ||
+                                                e.currentTarget.style.color;
+                                        }}
+                                        onMouseLeave={(e) => {
+                                            e.currentTarget.style.background =
+                                                opts.searchButtonBgColor ||
+                                                "#2563eb";
+                                            e.currentTarget.style.color =
+                                                opts.searchButtonColor ||
+                                                "#fff";
+                                        }}
+                                    >
+                                        {showButtonIcon && (
+                                            <svg
+                                                xmlns="http://www.w3.org/2000/svg"
+                                                width="1em"
+                                                height="1em"
+                                                viewBox="0 0 24 24"
+                                            >
+                                                <g
+                                                    fill="none"
+                                                    stroke="currentColor"
+                                                    stroke-linecap="round"
+                                                    stroke-linejoin="round"
+                                                    stroke-width="2"
+                                                >
+                                                    <path d="m21 21l-4.34-4.34" />
+                                                    <circle
+                                                        cx="11"
+                                                        cy="11"
+                                                        r="8"
+                                                    />
+                                                </g>
+                                            </svg>
+                                        )}
+                                        <span>{searchButtonText}</span>
+                                    </button>
+                                )}
+                            </form>
+                        </div>
+                    );
+                },
+                [
+                    [400, 60],
+                    [50, 50],
+                ],
+                [300, 48],
+                {
+                    fontSize: {
+                        type: "number",
+                        typeRefine: "slider",
+                        label: "Font Size",
+                        default: 16,
+                        min: 8,
+                        max: 32,
+                    },
+                    font: {
+                        type: "font",
+                        label: "Base Font",
+                        default: "System",
+                    },
+                    color: {
+                        type: "color",
+                        label: "Text Color",
+                        default: "#ffffff",
+                    },
+                    backgroundColor: {
+                        type: "color",
+                        label: "Background Color",
+                        default: "",
+                    },
+                    backgroundOpacity: {
+                        type: "number",
+                        typeRefine: "slider",
+                        label: "Background Opacity",
+                        default: 100,
+                        min: 0,
+                        max: 100,
+                    },
+                    borderRadius: {
+                        type: "number",
+                        typeRefine: "slider",
+                        label: "Container Border Radius (px)",
+                        default: 8,
+                        min: 0,
+                        max: 50,
+                    },
+                    customCss: {
+                        type: "string",
+                        label: "Custom CSS (inline)",
+                        default: "",
+                        typeRefine: "multiline",
+                    },
+                    engine: {
+                        type: "option",
+                        label: "Default Search Engine",
+                        default: "google",
+                        options: [
+                            { value: "google", label: "Google" },
+                            { value: "duckduckgo", label: "DuckDuckGo" },
+                            { value: "bing", label: "Bing" },
+                            { value: "brave", label: "Brave" },
+                            { value: "yahoo", label: "Yahoo" },
+                        ],
+                    },
+                    showEngineSelector: {
+                        type: "boolean",
+                        label: "Show Search Engine Selector",
+                        default: false,
+                    },
+                    searchBarBgColor: {
+                        type: "color",
+                        label: "Search Bar Background",
+                        default: "#111111",
+                    },
+                    searchBarBgOpacity: {
+                        type: "number",
+                        typeRefine: "slider",
+                        label: "Search Bar Background Opacity",
+                        default: 100,
+                        min: 0,
+                        max: 100,
+                    },
+                    searchBarRoundness: {
+                        type: "number",
+                        typeRefine: "slider",
+                        label: "Search Bar Roundness (px)",
+                        default: 12,
+                        min: 0,
+                        max: 40,
+                    },
+                    hoverColor: {
+                        type: "color",
+                        label: "Input Hover Border Color",
+                        default: "#444444",
+                    },
+                    searchBoxFont: {
+                        type: "font",
+                        label: "Search Box Font",
+                        default: "System",
+                    },
+                    showSearchIconInside: {
+                        type: "boolean",
+                        label: "Show Search Icon Inside",
+                        default: true,
+                    },
+                    searchIconColor: {
+                        type: "color",
+                        label: "Search Icon Color",
+                        default: "#9aa0a6",
+                    },
+                    searchIconHoverColor: {
+                        type: "color",
+                        label: "Search Icon Hover Color",
+                        default: "#ffffff",
+                    },
+                    iconOpacity: {
+                        type: "number",
+                        typeRefine: "slider",
+                        label: "Search Icon Opacity",
+                        default: 100,
+                        min: 0,
+                        max: 100,
+                    },
+                    iconBgOpacity: {
+                        type: "number",
+                        typeRefine: "slider",
+                        label: "Search Icon Background Opacity",
+                        default: 0,
+                        min: 0,
+                        max: 100,
+                    },
+                    showSearchButton: {
+                        type: "boolean",
+                        label: "Show Search Button",
+                        default: true,
+                    },
+                    searchButtonText: {
+                        type: "string",
+                        label: "Search Button Text",
+                        default: "Search",
+                    },
+                    showSearchButtonIcon: {
+                        type: "boolean",
+                        label: "Show Search Button Icon",
+                        default: true,
+                    },
+                    searchButtonRoundness: {
+                        type: "number",
+                        typeRefine: "slider",
+                        label: "Search Button Roundness (px)",
+                        default: 8,
+                        min: 0,
+                        max: 40,
+                    },
+                    searchButtonBgColor: {
+                        type: "color",
+                        label: "Search Button Background",
+                        default: "#2563eb",
+                    },
+                    searchButtonHoverBgColor: {
+                        type: "color",
+                        label: "Search Button Hover Background",
+                        default: "",
+                    },
+                    searchButtonColor: {
+                        type: "color",
+                        label: "Search Button Text Color",
+                        default: "#ffffff",
+                    },
+                    searchButtonHoverColor: {
+                        type: "color",
+                        label: "Search Button Hover Text Color",
+                        default: "",
+                    },
+                    searchButtonOpacity: {
+                        type: "number",
+                        typeRefine: "slider",
+                        label: "Search Button Opacity",
+                        default: 100,
+                        min: 0,
+                        max: 100,
+                    },
+                    searchButtonFont: {
+                        type: "font",
+                        label: "Search Button Font",
+                        default: "System",
+                    },
+                    placeholder: {
+                        type: "string",
+                        label: "Placeholder Text",
+                        default: "Search...",
+                    },
+                    enterToSearch: {
+                        type: "boolean",
+                        label: "Enter to Search",
+                        default: true,
+                    },
+                    showSuggestions: {
+                        type: "boolean",
+                        label: "Show Suggestions",
+                        default: true,
+                    },
+                    showBangSuggestion: {
+                        type: "boolean",
+                        label: "Show Bang Suggestions (prep only)",
+                        default: false,
+                    },
+                    suggestionProvider: {
+                        type: "string",
+                        label: "Suggestion Provider URL",
+                        default:
+                            "https://suggestqueries.google.com/complete/search?client=firefox&q={{query}}",
+                    },
+                    suggestionsFont: {
+                        type: "font",
+                        label: "Suggestions Font",
+                        default: "System",
+                    },
+                    suggestionBgColor: {
+                        type: "color",
+                        label: "Suggestion Background Color",
+                        default: "#000000",
+                    },
+                    suggestionBgOpacity: {
+                        type: "number",
+                        typeRefine: "slider",
+                        label: "Suggestion Background Opacity",
+                        default: 90,
+                        min: 0,
+                        max: 100,
+                    },
+                    suggestionRoundness: {
+                        type: "number",
+                        typeRefine: "slider",
+                        label: "Suggestion Roundness (px)",
+                        default: 10,
+                        min: 0,
+                        max: 40,
+                    },
+                    selectedSuggestionColor: {
+                        type: "color",
+                        label: "Selected Suggestion Text Color",
+                        default: "#ffffff",
+                    },
+                    alreadyTypedColor: {
+                        type: "color",
+                        label: "Already Typed Color",
+                        default: "#9aa0a6",
+                    },
+                    useTabComplete: {
+                        type: "boolean",
+                        label: "Use Tab to Complete Suggestion",
+                        default: true,
+                    },
+                    suggestionShowOnlyRemainder: {
+                        type: "boolean",
+                        label: "Show Only Part That Needs To Be Typed",
+                        default: true,
+                    },
+                    useBangs: {
+                        type: "boolean",
+                        label: "Enable Bangs",
+                        default: true,
+                    },
+                },
+            );
+
             function EditWindow({
                 title,
                 icon,
@@ -1875,19 +4149,21 @@
                                 "Inter",
                                 "Times New Roman",
                             ];
-                            const [localFonts, setLocalFonts] = React.useState(null);
+                            const [localFonts, setLocalFonts] =
+                                React.useState(null);
 
                             React.useEffect(() => {
                                 async function fetchLocalFonts() {
                                     if ("queryLocalFonts" in window) {
                                         try {
-                                            const fonts = await window.queryLocalFonts();
+                                            const fonts =
+                                                await window.queryLocalFonts();
                                             const fontNames = Array.from(
                                                 new Set(
                                                     fonts
                                                         .map((f) => f.family)
-                                                        .filter(Boolean)
-                                                )
+                                                        .filter(Boolean),
+                                                ),
                                             ).sort();
                                             setLocalFonts(fontNames);
                                         } catch (e) {
@@ -1899,7 +4175,9 @@
                             }, []);
 
                             const fontsToShow =
-                                localFonts && Array.isArray(localFonts) && localFonts.length > 0
+                                localFonts &&
+                                Array.isArray(localFonts) &&
+                                localFonts.length > 0
                                     ? localFonts
                                     : fallbackFonts;
 
@@ -1909,7 +4187,9 @@
                                         {def.label || key}
                                     </label>
                                     <select
-                                        value={val || def.default || fontsToShow[0]}
+                                        value={
+                                            val || def.default || fontsToShow[0]
+                                        }
                                         className="bg-transparent border border-zinc-700 rounded px-2 py-1 text-sm"
                                         onChange={(e) =>
                                             updateKey(key, e.target.value)
